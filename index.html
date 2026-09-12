@@ -1651,6 +1651,9 @@ function toggleIngresoFlip() {
   if (!card) return;
   const flipped = card.classList.toggle('flipped');
   if (pollingTimer) iniciarPolling(flipped ? CHEQUEO_RAPIDO_MS : CHEQUEO_MS);
+  // Al voltear hacia el dorso, no esperamos al próximo ciclo del intervalo:
+  // chequeamos ya mismo si hay algo nuevo, así arranca con el dato fresco.
+  if (flipped) chequearActualizaciones();
 }
 
 // Vuelve la tarjeta al frente (stands) SOLO cuando corresponde: al cargar
