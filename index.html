@@ -218,6 +218,26 @@
   .occ-chip-ingreso-pend { background: rgba(255,255,255,.1); }
   .occ-chip-ingreso-pend .occ-chip-num { color: #ffffff; }
 
+  /* ── Efecto B (actualización en vivo del dorso de ingreso): el número
+     que cambió "rebota" bien marcado + un glow alrededor del chip — ver
+     animateIngresoCountUp y el bloque de "cambioEnVivo" en buildStats(). ── */
+  @keyframes ingresoNumberBump {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.45); }
+    58%  { transform: scale(.92); }
+    100% { transform: scale(1); }
+  }
+  .ingreso-bump {
+    display: inline-block;
+    animation: ingresoNumberBump .75s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes ingresoChipGlow {
+    0%   { box-shadow: 0 0 0 0 rgba(10,132,255,.65); }
+    60%  { box-shadow: 0 0 0 11px rgba(10,132,255,0); }
+    100% { box-shadow: 0 0 0 0 rgba(10,132,255,0); }
+  }
+  .ingreso-chip-glow { animation: ingresoChipGlow .8s ease-out; }
+
   /* ── STATS (oculto) ── */
   .stats { display: none; }
 
@@ -1605,6 +1625,11 @@ let ultimoTimestampConocido = null;
 let pollingTimer = null;
 let pollEnCurso = false; // evita que se apilen chequeos si el anterior (o el load(true) que dispara) todavía no terminó
 
+// ── Estado de la animación del dorso de ingreso (ver buildStats / toggleIngresoFlip) ──
+let lastIngresoStats = { pct: 0, ok: 0, pend: 0, total: 0 }; // último dato real conocido
+let ingresoStatsConocidos = false; // false hasta el primer buildStats() con datos
+let ingresoAnimEnCurso = false;    // true mientras corre el conteo 0→real al voltear
+
 async function chequearActualizaciones() {
   // No competir por red/Apps Script con una acción en curso (venta, pago,
   // mobiliario, contrato, ingreso, etc.): esas ya van a disparar su propio
@@ -1653,7 +1678,60 @@ function toggleIngresoFlip() {
   if (pollingTimer) iniciarPolling(flipped ? CHEQUEO_RAPIDO_MS : CHEQUEO_MS);
   // Al voltear hacia el dorso, no esperamos al próximo ciclo del intervalo:
   // chequeamos ya mismo si hay algo nuevo, así arranca con el dato fresco.
-  if (flipped) chequearActualizaciones();
+  if (flipped) {
+    animateIngresoCountUp();
+    chequearActualizaciones();
+  }
+}
+
+// Arranca el dorso de ingreso desde cero (0%, 0 ingresaron, todos "faltan")
+// y cuenta rápido hasta el dato real ya conocido (lastIngresoStats), igual
+// que flipWithCountUp() en la demo de efectos. Se dispara cada vez que se
+// voltea hacia el dorso; mientras corre, buildStats() no pisa el DOM (ver
+// el guard de ingresoAnimEnCurso ahí) para no pelearse con este conteo.
+function animateIngresoCountUp() {
+  const elPctIng = document.getElementById('occPctIngreso');
+  const elOk     = document.getElementById('occValIngresoOk');
+  const elPend   = document.getElementById('occValIngresoPend');
+  const segOk    = document.getElementById('occSegIngresoOk');
+  const segPend  = document.getElementById('occSegIngresoPend');
+  if (!elPctIng || !elOk || !elPend || !segOk || !segPend) return;
+
+  const destino = lastIngresoStats;
+  const total = destino.total || 0;
+
+  ingresoAnimEnCurso = true;
+  elPctIng.textContent = '0%';
+  elOk.textContent = '0';
+  elPend.textContent = total;
+  segOk.style.width   = '0%';
+  segPend.style.width = total > 0 ? '100%' : '0%';
+
+  const duracionMs = 1700; // antes 650ms: muy rápido, no se alcanzaba a notar que arrancaba en 0
+  const pausaInicialMs = 300; // pequeña pausa mostrando "0" antes de empezar a contar
+  const inicio = performance.now() + pausaInicialMs;
+  function step(ahora) {
+    const t = Math.max(0, Math.min(1, (ahora - inicio) / duracionMs));
+    const eased = 1 - Math.pow(1 - t, 3); // ease-out cúbico, igual que en la demo
+    const pctActual = Math.round(destino.pct * eased);
+    const okActual  = Math.round(destino.ok  * eased);
+    elPctIng.textContent = pctActual + '%';
+    elOk.textContent = okActual;
+    elPend.textContent = total - okActual;
+    segOk.style.width   = total > 0 ? (okActual/total*100) + '%'        : '0%';
+    segPend.style.width = total > 0 ? ((total-okActual)/total*100) + '%' : '0%';
+    if (ahora < inicio + duracionMs) {
+      requestAnimationFrame(step);
+    } else {
+      elPctIng.textContent = destino.pct + '%';
+      elOk.textContent = destino.ok;
+      elPend.textContent = destino.pend;
+      segOk.style.width   = total > 0 ? (destino.ok/total*100)   + '%' : '0%';
+      segPend.style.width = total > 0 ? (destino.pend/total*100) + '%' : '0%';
+      ingresoAnimEnCurso = false;
+    }
+  }
+  requestAnimationFrame(step);
 }
 
 // Vuelve la tarjeta al frente (stands) SOLO cuando corresponde: al cargar
@@ -1770,15 +1848,57 @@ function buildStats() {
   const nFaltan = totalConfirmados - nIngresaron;
   const pctIngreso = totalConfirmados > 0 ? Math.round((nIngresaron / totalConfirmados) * 100) : 0;
 
-  const elPctIng = document.getElementById('occPctIngreso'); if (elPctIng) elPctIng.textContent = pctIngreso + '%';
-  const elOk   = document.getElementById('occValIngresoOk');   if (elOk)   elOk.textContent = nIngresaron;
-  const elPend = document.getElementById('occValIngresoPend'); if (elPend) elPend.textContent = nFaltan;
-  if (totalConfirmados > 0) {
-    const segOk   = document.getElementById('occSegIngresoOk');
-    const segPend = document.getElementById('occSegIngresoPend');
-    if (segOk)   segOk.style.width   = (nIngresaron/totalConfirmados*100) + '%';
-    if (segPend) segPend.style.width = (nFaltan/totalConfirmados*100) + '%';
+  // Guardamos siempre el dato real más fresco: es el "destino" que usa
+  // animateIngresoCountUp() cuando se voltea la tarjeta (ver toggleIngresoFlip),
+  // y la referencia contra la que comparamos para detectar cambios en vivo.
+  const statsIngresoNuevos = { pct: pctIngreso, ok: nIngresaron, pend: nFaltan, total: totalConfirmados };
+
+  const elPctIng = document.getElementById('occPctIngreso');
+  const elOk     = document.getElementById('occValIngresoOk');
+  const elPend   = document.getElementById('occValIngresoPend');
+  const segOk    = document.getElementById('occSegIngresoOk');
+  const segPend  = document.getElementById('occSegIngresoPend');
+  const cardIng  = document.getElementById('ingresoFlipCard');
+  const dorsoVisible = !!(cardIng && cardIng.classList.contains('flipped'));
+
+  // Si la tarjeta está mirando el dorso y este no es el primer dato que
+  // recibimos, comparamos contra lo último conocido para saber si hay que
+  // disparar el efecto B (número que "rebota") en vez de solo pisar el valor.
+  const cambioEnVivo = ingresoStatsConocidos && dorsoVisible && (
+    statsIngresoNuevos.pct !== lastIngresoStats.pct ||
+    statsIngresoNuevos.ok  !== lastIngresoStats.ok  ||
+    statsIngresoNuevos.pend!== lastIngresoStats.pend
+  );
+
+  // Si el conteo inicial (animateIngresoCountUp) está en curso, no pisamos
+  // el DOM acá: la animación ya va a terminar mostrando el valor real que
+  // acabamos de guardar en lastIngresoStats.
+  if (!ingresoAnimEnCurso) {
+    if (elPctIng) elPctIng.textContent = pctIngreso + '%';
+    if (elOk)     elOk.textContent     = nIngresaron;
+    if (elPend)   elPend.textContent   = nFaltan;
+    if (segOk)   segOk.style.width   = totalConfirmados > 0 ? (nIngresaron/totalConfirmados*100) + '%' : '0%';
+    if (segPend) segPend.style.width = totalConfirmados > 0 ? (nFaltan/totalConfirmados*100)     + '%' : '0%';
+
+    if (cambioEnVivo) {
+      // ── Efecto B: bounce en los 3 números que cambiaron + glow en los chips ──
+      [elPctIng, elOk, elPend].forEach(el => {
+        if (!el) return;
+        el.classList.remove('ingreso-bump');
+        void el.offsetWidth; // reinicia la animación aunque ya estuviera en clase
+        el.classList.add('ingreso-bump');
+      });
+      [elOk?.closest('.occ-chip'), elPend?.closest('.occ-chip')].forEach(chip => {
+        if (!chip) return;
+        chip.classList.remove('ingreso-chip-glow');
+        void chip.offsetWidth;
+        chip.classList.add('ingreso-chip-glow');
+      });
+    }
   }
+
+  lastIngresoStats = statsIngresoNuevos;
+  ingresoStatsConocidos = true;
 
   // Pills del header
   const hp = document.getElementById('hpillPagado');
