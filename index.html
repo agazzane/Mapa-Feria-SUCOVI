@@ -185,6 +185,39 @@
   .occ-chip-libre  { background: rgba(255,255,255,.1); }
   .occ-chip-libre  .occ-chip-num { color: #ffffff; }
 
+  /* ── FLIP: la misma tarjeta, dada vuelta, muestra el % de ingreso del
+     día de feria (ver renderIngresoFlip / buildStats). Gira sobre el eje
+     horizontal (rotateX), como si se abriera hacia arriba. Vuelve sola al
+     frente solo al iniciar sesión o al tocar "Actualizar" — ver
+     resetIngresoFlip(); cualquier otra actualización (polling, dar
+     ingreso, un pago, etc.) respeta el lado en el que está. ── */
+  .flip-scene { perspective: 1200px; }
+  .flip-card {
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform .55s cubic-bezier(.4,.2,.2,1);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .flip-card.flipped { transform: rotateX(180deg); }
+  .flip-face {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .flip-face-back {
+    position: absolute; inset: 0;
+    transform: rotateX(180deg);
+  }
+  /* Dorso (ingreso): misma estructura de chips + barra que el frente,
+     en celeste para que se note que es otra cara de la tarjeta. */
+  .occ-bar-seg#occSegIngresoOk   { background: #0a84ff; }
+  .occ-bar-seg#occSegIngresoPend { background: rgba(255,255,255,.14); }
+  #occPctIngreso { color: #0a84ff; }
+  .occ-chip-ingreso-ok   { background: rgba(10,132,255,.15); }
+  .occ-chip-ingreso-ok   .occ-chip-num { color: #0a84ff; }
+  .occ-chip-ingreso-pend { background: rgba(255,255,255,.1); }
+  .occ-chip-ingreso-pend .occ-chip-num { color: #ffffff; }
+
   /* ── STATS (oculto) ── */
   .stats { display: none; }
 
@@ -891,28 +924,60 @@
 <div class="scroll-collapse" id="scrollCollapseGroup">
 <div class="scroll-collapse-inner">
 
-<!-- ── BARRA DE OCUPACIÓN (cuadrados con cantidades arriba, barra abajo) ── -->
+<!-- ── BARRA DE OCUPACIÓN (cuadrados con cantidades arriba, barra abajo) ──
+     Tocar la tarjeta la da vuelta y muestra el % de ingreso del día de
+     feria (ver toggleIngresoFlip / buildStats). ── -->
 <div class="occ-bar-wrap" id="occBarWrap">
-  <div class="occ-chips" id="occDetail">
-    <div class="occ-chip occ-chip-pagado">
-      <div class="occ-chip-num" id="occValPagado">—</div>
-      <div class="occ-chip-lbl">Pagado</div>
-    </div>
-    <div class="occ-chip occ-chip-senado">
-      <div class="occ-chip-num" id="occValSenado">—</div>
-      <div class="occ-chip-lbl">Señado</div>
-    </div>
-    <div class="occ-chip occ-chip-libre">
-      <div class="occ-chip-num" id="occValDisp">—</div>
-      <div class="occ-chip-lbl">Libre</div>
-    </div>
-  </div>
-  <div class="occ-bar-row">
-    <span class="occ-bar-pct" id="occPct">—</span>
-    <div class="occ-bar-track" id="occTrack">
-      <div class="occ-bar-seg" id="occSegPagado" style="width:0%"></div>
-      <div class="occ-bar-seg" id="occSegSenado" style="width:0%"></div>
-      <div class="occ-bar-seg" id="occSegDisp"   style="width:0%"></div>
+  <div class="flip-scene">
+    <div class="flip-card" id="ingresoFlipCard" onclick="toggleIngresoFlip()">
+
+      <!-- FRENTE: cantidad de stands (sin cambios) -->
+      <div class="flip-face flip-face-front">
+        <div class="occ-chips" id="occDetail">
+          <div class="occ-chip occ-chip-pagado">
+            <div class="occ-chip-num" id="occValPagado">—</div>
+            <div class="occ-chip-lbl">Pagado</div>
+          </div>
+          <div class="occ-chip occ-chip-senado">
+            <div class="occ-chip-num" id="occValSenado">—</div>
+            <div class="occ-chip-lbl">Señado</div>
+          </div>
+          <div class="occ-chip occ-chip-libre">
+            <div class="occ-chip-num" id="occValDisp">—</div>
+            <div class="occ-chip-lbl">Libre</div>
+          </div>
+        </div>
+        <div class="occ-bar-row">
+          <span class="occ-bar-pct" id="occPct">—</span>
+          <div class="occ-bar-track" id="occTrack">
+            <div class="occ-bar-seg" id="occSegPagado" style="width:0%"></div>
+            <div class="occ-bar-seg" id="occSegSenado" style="width:0%"></div>
+            <div class="occ-bar-seg" id="occSegDisp"   style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DORSO: % de feriantes ingresados (Pagado + Señado como base) -->
+      <div class="flip-face flip-face-back">
+        <div class="occ-chips">
+          <div class="occ-chip occ-chip-ingreso-ok">
+            <div class="occ-chip-num" id="occValIngresoOk">—</div>
+            <div class="occ-chip-lbl">Ingresaron</div>
+          </div>
+          <div class="occ-chip occ-chip-ingreso-pend">
+            <div class="occ-chip-num" id="occValIngresoPend">—</div>
+            <div class="occ-chip-lbl">Faltan</div>
+          </div>
+        </div>
+        <div class="occ-bar-row">
+          <span class="occ-bar-pct" id="occPctIngreso">—</span>
+          <div class="occ-bar-track">
+            <div class="occ-bar-seg" id="occSegIngresoOk"   style="width:0%"></div>
+            <div class="occ-bar-seg" id="occSegIngresoPend" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -1378,7 +1443,7 @@ let lastTap = 0;
 document.addEventListener('touchend', e => { const now=Date.now(); if(now-lastTap<300) e.preventDefault(); lastTap=now; }, {passive:false});
 
 // ── VERSIÓN DE LA APP ────────────────────────────────────────────────────────
-const APP_VERSION = 'v3.6';   // ← cambiá solo acá
+const APP_VERSION = 'v3.7';   // ← cambiá solo acá
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   const hv = document.getElementById('headerVersion');
@@ -1494,6 +1559,7 @@ async function refrescarManual() {
   if (!btn || btn.disabled) return;
   btn.disabled = true;
   btn.classList.add('spinning');
+  resetIngresoFlip(); // refresco manual explícito: vuelve la tarjeta al frente
   try {
     await load();
   } finally {
@@ -1528,7 +1594,13 @@ function enviarPerfFrontend(tipo, tiempos) {
 // mapa completo con load(true) — silencioso, sin tapar la pantalla con el
 // spinner. Así todos los que tienen la página abierta ven los cambios de
 // otros sin tener que refrescar manualmente.
-const CHEQUEO_MS = 60000; // 5 minutos (antes 5s — se espació para no competir con acciones reales)
+const CHEQUEO_MS = 60000; // 1 minuto (antes 5s — se espació para no competir con acciones reales)
+// Mientras la tarjeta de ocupación está volteada mostrando el % de ingreso,
+// aceleramos el mismo chequeo liviano (ver toggleIngresoFlip). No hace
+// falta un endpoint nuevo: es el mismo tipo=timestamp de siempre, solo que
+// preguntado más seguido durante la ventana en la que a alguien le importa
+// ver el ingreso casi en vivo. Vuelve solo a CHEQUEO_MS al voltear de nuevo.
+const CHEQUEO_RAPIDO_MS = 15000;
 let ultimoTimestampConocido = null;
 let pollingTimer = null;
 let pollEnCurso = false; // evita que se apilen chequeos si el anterior (o el load(true) que dispara) todavía no terminó
@@ -1565,9 +1637,33 @@ async function chequearActualizaciones() {
   }
 }
 
-function iniciarPolling() {
+function iniciarPolling(intervaloMs = CHEQUEO_MS) {
   if (pollingTimer) clearInterval(pollingTimer);
-  pollingTimer = setInterval(chequearActualizaciones, CHEQUEO_MS);
+  pollingTimer = setInterval(chequearActualizaciones, intervaloMs);
+}
+
+// ── FLIP de la tarjeta de ocupación (frente = stands, dorso = % ingreso) ──
+// Al voltear al dorso, aceleramos el polling (ver CHEQUEO_RAPIDO_MS); al
+// volver al frente, lo desaceleramos de nuevo. Este toggle es la ÚNICA
+// forma de pasar de un lado al otro — nada más lo hace automáticamente.
+function toggleIngresoFlip() {
+  const card = document.getElementById('ingresoFlipCard');
+  if (!card) return;
+  const flipped = card.classList.toggle('flipped');
+  if (pollingTimer) iniciarPolling(flipped ? CHEQUEO_RAPIDO_MS : CHEQUEO_MS);
+}
+
+// Vuelve la tarjeta al frente (stands) SOLO cuando corresponde: al cargar
+// recién logueado y al tocar "Actualizar" del header — ver los dos
+// call-sites de esta función más abajo. Cualquier otra actualización
+// (polling en segundo plano, dar ingreso, un pago, asignar un feriante,
+// etc.) deja la tarjeta como esté, mirando para el lado que el usuario
+// eligió.
+function resetIngresoFlip() {
+  const card = document.getElementById('ingresoFlipCard');
+  if (!card || !card.classList.contains('flipped')) return;
+  card.classList.remove('flipped');
+  if (pollingTimer) iniciarPolling(CHEQUEO_MS);
 }
 
 function buildGrid(gridId, data) {
@@ -1658,6 +1754,28 @@ function buildStats() {
   const vs = document.getElementById('occValSenado'); if(vs) vs.textContent = nSenado;
   const vd = document.getElementById('occValDisp');   if(vd) vd.textContent = nDisp;
   const vt = document.getElementById('occValTotal');  if(vt) vt.textContent = total;
+
+  // ── Dorso de la tarjeta: % de ingreso del día de feria ──
+  // Base = stands Pagado + Señado (los únicos que pueden llegar a
+  // ingresar). El estado "e" sale del grid (pbData/paData); el flag de
+  // ingreso vive aparte, en FULL_DATA.extraData[id].ingreso.
+  const extra = FULL_DATA.extraData || {};
+  const idsConfirmados = Object.keys(FULL_DATA.pbData||{}).concat(Object.keys(FULL_DATA.paData||{}))
+    .filter(id => { const s = (FULL_DATA.pbData||{})[id] || (FULL_DATA.paData||{})[id]; return s && (s.e === 'Pagado' || s.e === 'Señado'); });
+  const totalConfirmados = idsConfirmados.length;
+  const nIngresaron = idsConfirmados.filter(id => extra[id] && extra[id].ingreso === 'SI').length;
+  const nFaltan = totalConfirmados - nIngresaron;
+  const pctIngreso = totalConfirmados > 0 ? Math.round((nIngresaron / totalConfirmados) * 100) : 0;
+
+  const elPctIng = document.getElementById('occPctIngreso'); if (elPctIng) elPctIng.textContent = pctIngreso + '%';
+  const elOk   = document.getElementById('occValIngresoOk');   if (elOk)   elOk.textContent = nIngresaron;
+  const elPend = document.getElementById('occValIngresoPend'); if (elPend) elPend.textContent = nFaltan;
+  if (totalConfirmados > 0) {
+    const segOk   = document.getElementById('occSegIngresoOk');
+    const segPend = document.getElementById('occSegIngresoPend');
+    if (segOk)   segOk.style.width   = (nIngresaron/totalConfirmados*100) + '%';
+    if (segPend) segPend.style.width = (nFaltan/totalConfirmados*100) + '%';
+  }
 
   // Pills del header
   const hp = document.getElementById('hpillPagado');
@@ -3199,6 +3317,7 @@ function activarSesion(user, perfil) {
   // Filtro rápido "No ingresaron": solo visible para Admin (perfil 3)
   const noIngresadosBtn = document.getElementById('filtroNoIngresadosBtn');
   if (noIngresadosBtn) noIngresadosBtn.style.display = (CURRENT_PERFIL === 3) ? '' : 'none';
+  resetIngresoFlip(); // arranque de la app: la tarjeta de ocupación empieza mostrando stands
   load(); // carga el mapa recién después del login
   iniciarPolling(); // a partir de ahora, chequea cada CHEQUEO_MS si hubo cambios
 }
