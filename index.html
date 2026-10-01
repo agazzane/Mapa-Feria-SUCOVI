@@ -633,6 +633,23 @@
   .mob-open-btn { width: 100%; padding: 9px; background: white; color: #115e59; border: 1.5px solid #5eead4; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; font-family: var(--font); cursor: pointer; transition: background .18s; }
   .mob-open-btn:active { background: #f0fdfa; }
 
+  /* ── MOB EN STAND SEÑADO (se abre desde el menú de clic derecho) ── */
+  .mob-senado-btn { width: 100%; padding: 11px; background: #0369a1; color: white; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; font-family: var(--font); cursor: pointer; margin-top: 14px; transition: background .18s; }
+  .mob-senado-btn:active { background: #075985; }
+  .mob-senado-btn:disabled { background: #bae6fd; color: #0c4a6e; cursor: not-allowed; }
+  .mob-senado-msg { font-size: 12px; font-weight: 600; text-align: center; margin-top: 8px; min-height: 16px; }
+  .mob-senado-msg.ok  { color: #0d9488; }
+  .mob-senado-msg.err { color: #ff3b30; }
+  .mob-item-locked { font-size: 11px; font-weight: 600; color: #115e59; background: #ccfbf1; border: 1px solid #5eead4; border-radius: 100px; padding: 1px 8px; margin-left: 6px; white-space: nowrap; }
+  .mob-senado-hint { font-size: 12px; color: var(--text2); margin: -6px 0 12px; line-height: 1.4; }
+
+  /* ── MENÚ CONTEXTUAL DE STAND (clic derecho / mantener apretado) ── */
+  .stand { -webkit-touch-callout: none; }
+  .stand-ctx-menu { position: fixed; z-index: 1500; min-width: 190px; background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.22); padding: 6px; display: none; }
+  .stand-ctx-title { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .4px; padding: 6px 10px 4px; }
+  .stand-ctx-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; background: none; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; font-family: var(--font); color: #115e59; cursor: pointer; text-align: left; }
+  .stand-ctx-item:hover, .stand-ctx-item:active { background: #f0fdfa; }
+
   /* ── MOB ADICIONAL ── */
   .mob-adicional-section { margin-top: 14px; padding: 14px 16px; background: #f0fdfa; border: 1.5px solid #5eead4; border-radius: var(--radius); }
   .mob-adicional-title { font-size: 11px; font-weight: 700; color: #115e59; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
@@ -1157,6 +1174,12 @@
   <button class="success-continue-btn" id="successContinueBtn">Continuar</button>
 </div>
 
+<!-- MENÚ CONTEXTUAL DE STAND (solo aparece en stands Señados) -->
+<div class="stand-ctx-menu" id="standCtxMenu">
+  <div class="stand-ctx-title" id="standCtxTitle"></div>
+  <button class="stand-ctx-item" onclick="ctxAgregarMobiliario()">🪑 Agregar mobiliario</button>
+</div>
+
 <!-- MODAL -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
   <div class="modal" onclick="event.stopPropagation()">
@@ -1382,6 +1405,23 @@
       <button class="assign-btn" style="margin-top:14px;background:#0369a1;border:none" onclick="closeMobPanel()">Confirmar selección</button>
     </div>
 
+    <!-- Panel de mobiliario para stand Señado (se abre desde el clic derecho en el mapa) -->
+    <div class="mob-panel" id="mobSenadoPanel">
+      <div class="mob-header">
+        <button class="mob-back" onclick="closeMobSenadoPanel()">← Volver</button>
+        <div class="mob-title" id="mobSenadoTitle">🪑 Agregar mobiliario</div>
+      </div>
+      <div class="mob-senado-hint">Lo ya alquilado no se puede modificar. Elegí solo lo que se <strong>agrega</strong>: se suma al Total y al Debe.</div>
+      <div class="mob-list" id="mobSenadoList"></div>
+      <div class="mob-summary" id="mobSenadoSummary">
+        <div class="mob-summary-label">Mobiliario a agregar</div>
+        <div class="mob-summary-text" id="mobSenadoSummaryText"></div>
+        <div class="mob-adicional-total" id="mobSenadoTotal"></div>
+      </div>
+      <button class="mob-senado-btn" id="mobSenadoBtn" onclick="agregarMobSenado()" disabled>Confirmar mobiliario</button>
+      <div class="mob-senado-msg" id="mobSenadoMsg"></div>
+    </div>
+
     <!-- Panel de selección de mob adicional -->
     <div class="mob-panel" id="mobAdicionalPanel">
       <div class="mob-header">
@@ -1463,7 +1503,7 @@ let lastTap = 0;
 document.addEventListener('touchend', e => { const now=Date.now(); if(now-lastTap<300) e.preventDefault(); lastTap=now; }, {passive:false});
 
 // ── VERSIÓN DE LA APP ────────────────────────────────────────────────────────
-const APP_VERSION = 'v3.7';   // ← cambiá solo acá
+const APP_VERSION = 'v3.8';   // ← cambiá solo acá
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   const hv = document.getElementById('headerVersion');
@@ -2095,6 +2135,7 @@ function openModal(id, evt) {
   document.getElementById('mobPanel').classList.remove('active');
   document.getElementById('comentariosPanel').classList.remove('active');
   document.getElementById('mobAdicionalPanel').classList.remove('active');
+  document.getElementById('mobSenadoPanel').classList.remove('active');
   document.getElementById('mainPanel').classList.remove('hidden');
   resetMobQty();
   updateMobSummary();
@@ -3873,6 +3914,219 @@ function renderMobReadonly(extra) {
   container.innerHTML = items
     .map(m => `<span class="mob-readonly-chip">${m.label} ×${extra[m.key]}</span>`)
     .join('');
+}
+
+// ── MOBILIARIO EN STAND SEÑADO — menú de clic derecho (perfil 1 y 3) ─────────
+// Clic derecho (o mantener apretado en el celular) sobre un stand Señado ofrece
+// una única opción: agregar mobiliario. Solo SUMA al que ya tiene el stand
+// (lo ya alquilado se muestra bloqueado). No registra pago: el importe se suma
+// al Total y al Debe, y al confirmar se refresca el mapa.
+let mobSenadoQty = {};
+let ctxStandId = null;
+let suppressStandClickUntil = 0;
+
+function standEsSenadoParaMenu(id) {
+  if (CURRENT_PERFIL !== 1 && CURRENT_PERFIL !== 3) return false;
+  const d = ((FULL_DATA && FULL_DATA.pbData) || {})[id] || ((FULL_DATA && FULL_DATA.paData) || {})[id];
+  return !!d && d.e === 'Señado';
+}
+
+function showStandCtxMenu(id, x, y) {
+  const menu = document.getElementById('standCtxMenu');
+  ctxStandId = id;
+  document.getElementById('standCtxTitle').textContent = `Stand ${id}`;
+  menu.style.display = 'block';
+  const w = menu.offsetWidth, h = menu.offsetHeight;
+  menu.style.left = Math.max(8, Math.min(x, window.innerWidth  - w - 8)) + 'px';
+  menu.style.top  = Math.max(8, Math.min(y, window.innerHeight - h - 8)) + 'px';
+}
+function hideStandCtxMenu() {
+  const menu = document.getElementById('standCtxMenu');
+  if (menu) menu.style.display = 'none';
+}
+
+// Desktop (clic derecho) y Android (mantener apretado dispara contextmenu)
+document.addEventListener('contextmenu', e => {
+  const st = e.target.closest && e.target.closest('.stand');
+  if (!st || !standEsSenadoParaMenu(st.dataset.num)) return; // otros stands: menú normal del navegador
+  e.preventDefault();
+  showStandCtxMenu(st.dataset.num, e.clientX, e.clientY);
+});
+
+// Celular/tablet (también iOS): mantener apretado ~0,5 s sin mover el dedo
+(function() {
+  let timer = null, start = null;
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  document.addEventListener('touchstart', e => {
+    cancel();
+    if (e.touches.length !== 1) return;
+    const st = e.target.closest && e.target.closest('.stand');
+    if (!st || !standEsSenadoParaMenu(st.dataset.num)) return;
+    const t = e.touches[0];
+    start = { x: t.clientX, y: t.clientY };
+    timer = setTimeout(() => {
+      timer = null;
+      suppressStandClickUntil = Date.now() + 800; // que al soltar no se abra la ficha
+      showStandCtxMenu(st.dataset.num, start.x, start.y);
+    }, 550);
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!timer || !start) return;
+    const t = e.touches[0];
+    if (Math.abs(t.clientX - start.x) > 10 || Math.abs(t.clientY - start.y) > 10) cancel();
+  }, { passive: true });
+  document.addEventListener('touchend', cancel, { passive: true });
+  document.addEventListener('touchcancel', cancel, { passive: true });
+})();
+
+// Si el menú salió por mantener apretado, el "soltar" no debe abrir la ficha del stand
+document.addEventListener('click', e => {
+  if (Date.now() < suppressStandClickUntil) { e.stopPropagation(); e.preventDefault(); }
+}, true);
+
+// Cerrar el menú al tocar afuera, scrollear, redimensionar o con Escape
+document.addEventListener('pointerdown', e => {
+  const menu = document.getElementById('standCtxMenu');
+  if (menu && menu.style.display === 'block' && !menu.contains(e.target)) hideStandCtxMenu();
+}, true);
+document.addEventListener('scroll', hideStandCtxMenu, true);
+window.addEventListener('resize', hideStandCtxMenu);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideStandCtxMenu(); });
+
+// Opción del menú: abre la ficha del stand directamente en la lista de mobiliario
+function ctxAgregarMobiliario() {
+  const id = ctxStandId;
+  hideStandCtxMenu();
+  if (!id || !standEsSenadoParaMenu(id)) return;
+  openModal(id, null);
+  resetMobSenadoUI();
+  openMobSenadoPanel();
+}
+
+function resetMobSenadoQty() {
+  mobSenadoQty = {};
+  MOB_ITEMS.forEach(m => { mobSenadoQty[m.key] = 0; });
+}
+
+function calcTotalMobSenado() {
+  return MOB_ITEMS.reduce((sum, m) => sum + (mobSenadoQty[m.key] || 0) * (PRECIOS_MOB[m.label] || 0), 0);
+}
+
+function resetMobSenadoUI() {
+  resetMobSenadoQty();
+  document.getElementById('mobSenadoSummary').classList.remove('visible');
+  document.getElementById('mobSenadoSummaryText').textContent = '';
+  document.getElementById('mobSenadoTotal').textContent = '';
+  const msg = document.getElementById('mobSenadoMsg');
+  msg.textContent = ''; msg.className = 'mob-senado-msg';
+  const btn = document.getElementById('mobSenadoBtn');
+  clearBtnBusy(btn, 'Confirmar mobiliario');
+  btn.disabled = true;
+}
+
+function openMobSenadoPanel() {
+  const extra = (FULL_DATA.extraData||{})[currentStandId] || {};
+  document.getElementById('mobSenadoTitle').textContent = `🪑 Stand ${currentStandId}`;
+  document.getElementById('mobSenadoList').innerHTML = MOB_ITEMS.map(m => {
+    const precio    = PRECIOS_MOB[m.label];
+    const precioStr = precio ? `<span style="font-size:12px;color:#64748b;font-weight:500">$${precio.toLocaleString('es-AR')}</span>` : '';
+    const yaTiene   = Number(extra[m.key] || 0);
+    const lockedStr = yaTiene > 0 ? `<span class="mob-item-locked">🔒 Ya alquilado ×${yaTiene}</span>` : '';
+    return `
+    <div class="mob-item">
+      <div class="mob-item-name">${m.label} ${precioStr}${lockedStr}</div>
+      <div class="mob-counter">
+        <button class="mob-btn minus" onclick="changeMobSenadoQty('${m.key}',-1)">−</button>
+        <span class="mob-qty" id="msqty_${m.key}">${mobSenadoQty[m.key]||0}</span>
+        <button class="mob-btn" onclick="changeMobSenadoQty('${m.key}',1)">+</button>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('mainPanel').classList.add('hidden');
+  document.getElementById('mobSenadoPanel').classList.add('active');
+}
+
+// Volver: se descarta lo elegido y se muestra la ficha normal del stand
+function closeMobSenadoPanel() {
+  resetMobSenadoUI();
+  document.getElementById('mobSenadoPanel').classList.remove('active');
+  document.getElementById('mainPanel').classList.remove('hidden');
+}
+
+function changeMobSenadoQty(key, delta) {
+  mobSenadoQty[key] = Math.max(0, (mobSenadoQty[key]||0) + delta); // piso en 0: lo ya alquilado no se toca
+  const el = document.getElementById('msqty_' + key);
+  if (el) el.textContent = mobSenadoQty[key];
+  updateMobSenadoSummary();
+}
+
+function updateMobSenadoSummary() {
+  const items = MOB_ITEMS.filter(m => mobSenadoQty[m.key] > 0);
+  const summaryEl = document.getElementById('mobSenadoSummary');
+  const btn = document.getElementById('mobSenadoBtn');
+  const msg = document.getElementById('mobSenadoMsg');
+  msg.textContent = ''; msg.className = 'mob-senado-msg';
+  if (items.length === 0) {
+    summaryEl.classList.remove('visible');
+    document.getElementById('mobSenadoTotal').textContent = '';
+    btn.disabled = true;
+  } else {
+    const total = calcTotalMobSenado();
+    document.getElementById('mobSenadoSummaryText').textContent = items.map(m => `${m.label} ×${mobSenadoQty[m.key]}`).join(' · ');
+    document.getElementById('mobSenadoTotal').textContent = total > 0 ? `Se suma al Debe: $${total.toLocaleString('es-AR')}` : '';
+    summaryEl.classList.add('visible');
+    btn.disabled = false;
+  }
+}
+
+async function agregarMobSenado() {
+  const btn   = document.getElementById('mobSenadoBtn');
+  const msgEl = document.getElementById('mobSenadoMsg');
+  const items = MOB_ITEMS.filter(m => mobSenadoQty[m.key] > 0);
+  const total = calcTotalMobSenado();
+  msgEl.textContent = ''; msgEl.className = 'mob-senado-msg';
+  if (!currentStandId) return;
+  if (items.length === 0) { msgEl.textContent = 'Seleccioná al menos un ítem de mobiliario.'; msgEl.className = 'mob-senado-msg err'; return; }
+
+  setBtnBusy(btn, 'Guardando...');
+  try {
+    const mobDesc   = items.map(m => `${mobSenadoQty[m.key]}×${m.label}`).join(' + ');
+    const mobParams = MOB_ITEMS.map(m => `${m.key}=${mobSenadoQty[m.key]||0}`).join('&');
+    const url  = `${API_URL}?tipo=mobsenado&mes=${encodeURIComponent(CURRENT_MES)}&stand=${encodeURIComponent(currentStandId)}&user=${encodeURIComponent(CURRENT_USER)}&mobdesc=${encodeURIComponent(mobDesc)}&${mobParams}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (!data.ok) {
+      clearBtnBusy(btn, 'Confirmar mobiliario');
+      msgEl.textContent = data.error || 'Error al agregar el mobiliario.';
+      msgEl.className = 'mob-senado-msg err';
+      return;
+    }
+
+    // Patch local inmediato: cantidades + importe al Total (p) y al Debe (d)
+    if (!FULL_DATA.extraData) FULL_DATA.extraData = {};
+    if (!FULL_DATA.extraData[currentStandId]) FULL_DATA.extraData[currentStandId] = {};
+    const ex = FULL_DATA.extraData[currentStandId];
+    MOB_ITEMS.forEach(m => {
+      const qty = mobSenadoQty[m.key] || 0;
+      if (qty > 0) ex[m.key] = (Number(ex[m.key]) || 0) + qty;
+    });
+    ex.p = (Number(ex.p) || 0) + total;
+    ex.d = (Number(ex.d) || 0) + total;
+    renderMapUI();
+    showToast('✅ Mobiliario agregado');
+    clearBtnBusy(btn, 'Confirmar mobiliario');
+
+    // Refresco real del mapa desde la planilla (mismo patrón que al saldar un pago)
+    await new Promise(r => setTimeout(r, 800)); // pausa visual para que se vea el toast
+    lockModal('Actualizando mapa...');
+    try { await load(); } catch(err) {}
+    document.getElementById('modalOverlay').classList.remove('open');
+    unlockModal();
+  } catch(err) {
+    clearBtnBusy(btn, 'Confirmar mobiliario');
+    msgEl.textContent = 'Error de conexión.';
+    msgEl.className = 'mob-senado-msg err';
+  }
 }
 
 // ── MOBILIARIO ADICIONAL (stands Pagados, perfil 1) ──────────────────────────
