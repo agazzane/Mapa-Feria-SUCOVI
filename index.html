@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#3a1fb4">
 <title>Mapa de Stands – Feria SUCOVI 2026</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -305,6 +308,9 @@
   @keyframes floorFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
   .map-scroll { overflow: auto; padding: 6px; -webkit-overflow-scrolling: touch; flex: 1 1 auto; min-height: 0; }
   .map-inner { position: relative; }
+  /* Mientras se cambia de planta, la barra de scroll se vuelve invisible (sigue ocupando su
+     lugar, así que no hay saltos de layout) para que no se vea deslizar junto con el mapa. */
+  .floor-sliding .map-scroll { scrollbar-color: transparent transparent; }
   .map-zoom  { transform-origin: top left; width: max-content; transition: transform 0.15s ease; position: relative; }
   .map-bg { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 0; }
   .grid { display: grid; gap: 2px; grid-auto-rows: 30px; position: relative; z-index: 1; }
@@ -1394,6 +1400,248 @@
       z-index: 6;
     }
   }
+
+/* TEMA iBANK */
+
+:root {
+  --font: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+  --ind: #3a1fb4;  --ind2: #2a1594;  --ind-soft: #ece9fb;  --ind-line: #cfc8f3;
+  --blue: #2e9bff; --pink: #ee4266;  --org: #ffb23e;       --grn: #22b573;
+  --line: #e7e8f2;
+  --sh: 0 6px 18px rgba(58,31,180,.10);
+
+  --bg: #f4f5fb;  --surface: #ffffff;  --surface2: #f4f5fb;
+  --border: var(--line);
+  --text: #1d1b3a;  --text2: #3d3b5c;  --text3: #8b8fa8;
+  --accent: var(--ind);
+  --radius: 16px;  --radius-sm: 12px;
+  --shadow-sm: 0 2px 8px rgba(58,31,180,.08);
+  --shadow: var(--sh);
+  --shadow-lg: 0 18px 48px rgba(29,27,58,.22);
+
+  --pagado: var(--grn);  --senado: var(--org);  --excedido: var(--pink);  --disp: #fff;
+}
+
+html, body { background: var(--bg); }
+body { font-family: var(--font); color: var(--text); }
+button, input, select, textarea { font-family: var(--font); }
+
+/* ── HEADER (bloque índigo con base curva) ── */
+header {
+  background: var(--ind); border-bottom: none;
+  border-radius: 0 0 28px 28px; padding: 12px 18px 16px;
+  box-shadow: 0 8px 20px rgba(58,31,180,.25);
+}
+.header-logo-sq { width: 42px; height: 42px; border-radius: 50%; background: #fff; border: 2px solid rgba(255,255,255,.45); }
+.header-row-top h1 { font-size: 16px; font-weight: 600; color: #fff; }
+header p { color: rgba(255,255,255,.75); }
+.header-mes-badge { background: rgba(255,255,255,.18); border: none; color: #fff; font-weight: 600; }
+.header-refresh-btn, .login-user-pill {
+  background: rgba(255,255,255,.16); border: none; color: #fff; border-radius: 12px;
+}
+.header-refresh-btn:hover, .login-user-pill:hover { background: rgba(255,255,255,.26); }
+.login-user-pill { border-radius: 100px; }
+.user-pill-avatar { background: #fff; color: var(--ind); }
+
+/* ── TARJETA DE OCUPACIÓN (estilo tarjeta de crédito del kit) ── */
+.occ-bar-wrap { background: transparent; border-bottom: none; padding: 16px 18px 6px; }
+.flip-face-front, .flip-face-back {
+  border-radius: 22px; padding: 16px; overflow: hidden; color: #fff;
+  background: linear-gradient(135deg, #2a1594 0%, #3a1fb4 60%, #4a3ad0 100%);
+  box-shadow: 0 14px 28px rgba(58,31,180,.35);
+}
+.flip-face-front { position: relative; }
+.flip-face-front::before, .flip-face-back::before {
+  content: ''; position: absolute; right: -50px; top: -40px;
+  width: 170px; height: 170px; border-radius: 50%;
+  background: linear-gradient(160deg, #3fb0ff, #2e8bff); opacity: .95; pointer-events: none;
+}
+.occ-chips, .occ-bar-row { position: relative; }
+.occ-chip { background: rgba(255,255,255,.14); border: none; border-radius: 14px; }
+.occ-chip-pagado, .occ-chip-senado, .occ-chip-libre,
+.occ-chip-ingreso-ok, .occ-chip-ingreso-pend { background: rgba(255,255,255,.14); }
+.occ-chip-pagado .occ-chip-num { color: #5df0a8; }
+.occ-chip-senado .occ-chip-num { color: #ffd36b; }
+.occ-chip-libre .occ-chip-num,
+.occ-chip-ingreso-ok .occ-chip-num,
+.occ-chip-ingreso-pend .occ-chip-num { color: #fff; }
+.occ-chip-lbl { color: rgba(255,255,255,.8); }
+.occ-bar-pct, #occPctIngreso { color: #fff; }
+.occ-bar-track { background: rgba(255,255,255,.22); height: 8px; border-radius: 20px; }
+.occ-bar-seg#occSegPagado { background: #3ddc97; }
+.occ-bar-seg#occSegSenado { background: var(--org); }
+.occ-bar-seg#occSegDisp   { background: rgba(255,255,255,.2); }
+.occ-bar-seg#occSegIngresoOk   { background: #fff; }
+.occ-bar-seg#occSegIngresoPend { background: transparent; }
+
+/* ── TABS (botones segmentados) ── */
+.tabs {
+  background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+  border-bottom: none; padding: 12px 18px 4px; gap: 10px;
+}
+.tab-btn {
+  margin: 0; border: none; border-radius: 14px; padding: 11px 8px;
+  background: #e9eaf6; color: var(--ind); font-weight: 500;
+}
+.tab-btn.active { background: var(--ind); color: #fff; font-weight: 600; box-shadow: 0 8px 16px rgba(58,31,180,.3); }
+
+/* ── BUSCADOR + FILTROS ── */
+.search-filters-row { background: transparent; border-bottom: none; padding: 10px 18px; gap: 10px; }
+.search-wrap-compact { background: #fff; border: 1px solid var(--line); border-radius: 14px; height: 38px; }
+.filter-btn { background: #fff; color: var(--text); border: 1px solid var(--line); border-radius: 100px; padding: 7px 14px; }
+.filter-btn.active, .filter-btn#filtroMobBtn.active, .filter-btn#filtroDispBtn.active,
+.filter-btn#filtroNoIngresadosBtn.active { background: var(--ind); border-color: var(--ind); color: #fff; }
+
+/* ── MAPA ── */
+.map-scroll { background: transparent; }
+.map-bg { border-radius: 16px; }
+.stand {
+  border-radius: 16px; border: 1.5px solid transparent; box-shadow: none; overflow: visible;
+}
+.stand::before {
+  content: ''; position: absolute; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 0 4px 4px 0;
+}
+.stand[data-e="Pagado"]     { background: #3ddc97; color: #06301d; }
+.stand[data-e="Pagado"]::before   { background: #1e9e68; }
+.stand[data-e="Señado"]     { background: #ffd43b; color: #4a3600; }
+.stand[data-e="Señado"]::before   { background: #e6b800; }
+.stand[data-e="Excedido"]   { background: #ffe6ea; color: #a8203d; }
+.stand[data-e="Excedido"]::before { background: var(--pink); }
+.stand[data-e="Disponible"] { background: #fff; color: var(--ind); border: 1.5px dashed var(--ind-line); }
+.stand[data-e="Disponible"]::before { background: var(--ind); }
+.stand.highlighted { box-shadow: 0 0 0 3px var(--ind), 0 8px 20px rgba(58,31,180,.3); }
+.stand.ingresado::after { background: var(--ind); border-radius: 0 0 14px 14px; }
+
+/* ── LEYENDA / ZOOM ── */
+.legend { background: #fff; border-top: 1px solid var(--line); box-shadow: 0 -4px 14px rgba(58,31,180,.06); }
+.leg-item { color: var(--text3); }
+.zoom-controls, .minimap { background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow-lg); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.zoom-btn { color: var(--ind); }
+.zoom-btn:active { background: var(--ind-soft); }
+
+/* ── MODAL (cabecera índigo) ── */
+.modal-overlay { background: rgba(29,27,58,.5); }
+.modal {
+  background: #fff; color: var(--text); border: none; border-radius: 30px 30px 0 0;
+  padding: 0 20px 40px; box-shadow: 0 -10px 40px rgba(29,27,58,.25);
+}
+@media (min-width: 640px) { .modal { border-radius: 30px; padding-bottom: 28px; } }
+.modal-handle { display: none; }
+.modal-sticky-header {
+  background: var(--ind); color: #fff; border-bottom: none;
+  margin: 0 -20px 14px; padding: 24px 20px 16px; border-radius: 0 0 24px 24px;
+}
+.modal-sticky-header::before {
+  content: ''; position: absolute; top: 9px; left: 50%; transform: translateX(-50%);
+  width: 40px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.4);
+}
+.modal-sticky-num { color: #fff; font-weight: 600; }
+.modal-sticky-badge[data-e="Pagado"]     { background: #3ddc97; color: #06301d; }
+.modal-sticky-badge[data-e="Señado"]     { background: var(--org); color: #5a3b00; }
+.modal-sticky-badge[data-e="Disponible"] { background: #fff; color: var(--ind); border-color: #fff; }
+.modal-sticky-badge[data-e="Excedido"]   { background: var(--pink); color: #fff; }
+.modal-close, .comentarios-icon-btn { background: rgba(255,255,255,.2); color: #fff; border: none; }
+.modal-nombre { color: var(--text); font-weight: 600; }
+.modal-rubro, .modal-zona { color: var(--text3); }
+.modal-nuevo-badge { background: #e3f7ee; color: #0d6a45; }
+.modal-tel { background: #e9f9f1; border-color: #bfe9d6; color: #0d6a45; }
+
+.money-box { background: var(--bg); border-radius: 16px; }
+.money-box .amount { color: var(--text); font-weight: 700; }
+.money-box.debe-ok .amount  { color: var(--grn); }
+.money-box.debe-mal { background: var(--bg); }
+.money-box.debe-mal .amount { color: var(--pink); }
+
+/* Subtarjetas / secciones: todas blancas con borde suave */
+.assign-subcard, .assign-subcard-feriante, .assign-subcard-mobiliario, .assign-subcard-pago,
+.pagos-section, .mob-adicional-section {
+  background: #fff; border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--sh);
+}
+.ingreso-section, .mob-readonly { background: var(--bg); border: 1px solid var(--line); border-radius: 18px; }
+.assign-subcard-feriante .assign-subcard-title, .assign-subcard-mobiliario .assign-subcard-title,
+.assign-subcard-pago .assign-subcard-title, .pagos-title, .mob-adicional-title,
+.mob-adicional-pago-title, .pago-form-title, .alta-title, .mob-readonly-title { color: var(--ind); }
+.pago-label, .assign-pago-label, .mob-adicional-label, .alta-label { color: var(--text3); }
+.mob-adicional-pago-sep { background: var(--line); }
+.alta-hint { color: var(--text3); }
+
+/* Inputs */
+.login-select, .login-input, .assign-search-input, .assign-pago-input, .assign-pago-select,
+.pago-input, .pago-select, .mob-adicional-input, .mob-adicional-select,
+.alta-input, .alta-select, .comentarios-textarea {
+  background: #fff; color: var(--text); border: 1px solid var(--line); border-radius: 14px;
+}
+.login-select:focus, .login-input:focus, .assign-search-input:focus, .assign-pago-input:focus,
+.assign-pago-select:focus, .pago-input:focus, .pago-select:focus, .mob-adicional-input:focus,
+.mob-adicional-select:focus, .alta-input:focus, .alta-select:focus, .comentarios-textarea:focus {
+  border-color: var(--ind); box-shadow: 0 0 0 3px rgba(58,31,180,.12);
+}
+#mobAdicionalMonto { background: var(--ind-soft) !important; color: var(--ind) !important; }
+.select-wrap::after, .alta-select-wrap::after, .pago-select-wrap::after,
+.assign-pago-select-wrap::after, .mob-adicional-select-wrap::after { color: var(--ind); }
+
+/* Feriantes: dropdown y pills */
+.assign-dropdown { background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow-lg); }
+.assign-dropdown-item { color: var(--text); border-bottom: 1px solid var(--line); }
+.assign-dropdown-item:active, .assign-dropdown-item.focused { background: var(--ind-soft); color: var(--ind); }
+.assign-dropdown-item mark { background: var(--ind-soft); color: var(--ind); }
+.assign-selected-pill { background: var(--ind-soft); border-color: var(--ind-line); }
+.assign-selected-pill span, .assign-selected-pill button { color: var(--ind); }
+.assign-alta-btn { background: #fff; color: var(--ind); border: 1.5px dashed var(--ind-line); }
+
+/* Pagos y mobiliario */
+.pago-item { background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+.pago-item.cargado { background: #e9f9f1; border-color: #bfe9d6; }
+.pago-num { background: var(--ind); }
+.pago-item.cargado .pago-num { background: var(--grn); }
+.pago-item.cargado .pago-estado, .pago-monto { color: #0d6a45; }
+.mob-item { background: var(--bg); border: 1px solid var(--line); border-radius: 16px; }
+.mob-btn { background: var(--ind); }
+.mob-btn.minus { background: #e9eaf6; color: var(--ind); border: none; }
+.mob-back, .alta-back { background: var(--ind-soft); color: var(--ind); }
+.mob-summary, .mob-adicional-summary { background: var(--ind-soft); border-color: var(--ind-line); }
+.mob-summary-label, .mob-summary-text, .mob-adicional-summary-label, .mob-adicional-summary-text,
+.mob-adicional-total { color: var(--ind); }
+.mob-item-locked { background: var(--ind-soft); border-color: var(--ind-line); color: var(--ind); }
+.mob-readonly-chip { background: #fff; color: var(--text); border-color: var(--line); }
+.mob-open-btn, .mob-adicional-open-btn { background: #fff; color: var(--ind); border: 1.5px solid var(--ind-line); border-radius: 14px; }
+.comentarios-icon-dot { background: var(--org); }
+
+/* Botones principales */
+.login-btn, .assign-btn, .pago-btn, .alta-btn, .mob-adicional-btn,
+.mob-senado-btn, .comentarios-btn, .contrato-btn {
+  background: var(--ind) !important; color: #fff !important; border: none; border-radius: 16px;
+  font-weight: 600; box-shadow: 0 10px 20px rgba(58,31,180,.3);
+}
+.ingreso-btn { background: var(--grn) !important; color: #fff; border-radius: 16px; box-shadow: 0 10px 20px rgba(34,181,115,.3); }
+.login-btn:disabled, .assign-btn:disabled, .pago-btn:disabled, .alta-btn:disabled,
+.mob-adicional-btn:disabled, .mob-senado-btn:disabled, .comentarios-btn:disabled,
+.contrato-btn:disabled, .ingreso-btn:disabled {
+  background: #cfcbea !important; color: #fff !important; box-shadow: none;
+}
+.assign-msg.ok, .ingreso-info.ok, .pago-msg.ok, .alta-msg.ok { color: #0d6a45; }
+
+/* Menú contextual */
+.stand-ctx-menu { background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow-lg); }
+.stand-ctx-item { color: var(--ind); }
+.stand-ctx-item:hover, .stand-ctx-item:active { background: var(--ind-soft); }
+
+/* ── LOGIN / MES ── */
+#loginScreen, #mesScreen {
+  background: radial-gradient(90% 50% at 100% 0%, rgba(46,155,255,.55), transparent 60%),
+              linear-gradient(160deg, #2a1594 0%, #3a1fb4 100%);
+}
+.login-card { background: #fff; border-radius: 28px; box-shadow: 0 30px 70px rgba(10,5,50,.45); }
+.login-bio-btn { background: var(--ind-soft); color: var(--ind); border: none; border-radius: 16px; }
+
+/* ── OVERLAYS / TOAST ── */
+#loadingOverlay { background: rgba(29,27,58,.5); }
+.loading-card { background: #fff; border-radius: 22px; }
+.loading-spinner { border-color: #e7e8f2; border-top-color: var(--ind); }
+.loading-bar { background: var(--ind); }
+.success-continue-btn { background: var(--ind); border-radius: 16px; box-shadow: 0 10px 20px rgba(58,31,180,.3); }
+.toast.ok { background: var(--ind); }
+
 </style>
 </head>
 <body>
@@ -1554,6 +1802,7 @@
     <button class="filter-btn" id="filtroMobBtn"  onclick="toggleFiltro('mobiliario', this)">🪑 Con mobiliario</button>
     <button class="filter-btn" id="filtroDispBtn" onclick="toggleFiltro('disponible', this)">🔓 Disponible</button>
     <button class="filter-btn" id="filtroNoIngresadosBtn" style="display:none" onclick="toggleFiltro('noIngresados', this)">🚪 No ingresaron</button>
+    <button class="filter-btn" id="filtroNoFirmaronBtn" style="display:none" onclick="toggleFiltro('noFirmaron', this)">✍️ No firmaron</button>
   </div>
 </div>
 
@@ -1645,8 +1894,8 @@
 </div>
 
 <div class="legend">
-  <div class="leg-item"><div class="leg-dot" style="background:var(--pagado)"></div> Pagado</div>
-  <div class="leg-item"><div class="leg-dot" style="background:var(--senado)"></div> Señado</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#3ddc97"></div> Pagado</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#ffd43b"></div> Señado</div>
   <div class="leg-item"><div class="leg-dot" style="background:var(--disp);border:2px solid #9333ea"></div> Disponible</div>
   <div class="leg-item"><span style="display:inline-block;width:22px;height:9px;background:#007aff;border-radius:3px;color:#fff;font-size:7px;font-weight:700;text-align:center;line-height:9px;letter-spacing:.2px">ING</span> Ingresó a la feria</div>
   <div class="leg-item"><span style="font-size:15px;line-height:1">✍️</span> Contrato firmado</div>
@@ -1989,10 +2238,6 @@
           <label class="alta-label">Instagram <span class="opt">(opcional)</span></label>
           <input type="text" class="alta-input" id="altaIG" placeholder="@usuario" autocomplete="off">
         </div>
-        <div class="alta-field">
-          <label class="alta-label">DNI <span class="opt">(opcional)</span></label>
-          <input type="text" class="alta-input" id="altaDNI" placeholder="Ej: 30123456" autocomplete="off" inputmode="numeric">
-        </div>
         <button class="alta-btn" id="altaBtn" onclick="guardarNuevoFeriante()">Guardar feriante</button>
         <div class="alta-msg" id="altaMsg"></div>
       </div>
@@ -2021,7 +2266,7 @@ let lastTap = 0;
 document.addEventListener('touchend', e => { const now=Date.now(); if(now-lastTap<300) e.preventDefault(); lastTap=now; }, {passive:false});
 
 // ── VERSIÓN DE LA APP ────────────────────────────────────────────────────────
-const APP_VERSION = 'v3.9';   // ← cambiá solo acá
+const APP_VERSION = 'v3.10';   // ← cambiá solo acá
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   const hv = document.getElementById('headerVersion');
@@ -2467,23 +2712,91 @@ function buildStats() {
   if (hd) { hd.textContent = `Libre ${nDisp}`;    hd.style.display = 'inline-flex'; }
 }
 
+// ── CAMBIO DE PLANTA con deslizamiento horizontal ───────────────────────────
+// El mapa actual se desplaza un poco hacia un costado mientras se desvanece y
+// el nuevo entra desde el costado contrario (Baja → Alta hacia un lado,
+// Alta → Baja hacia el otro). La planta que sale se "congela" en su lugar
+// (position:fixed con las medidas que tenía) mientras la que entra ya ocupa
+// el espacio normal del layout; al terminar se limpia todo. Si el usuario
+// tiene activado "reducir movimiento" (o el navegador no soporta .animate),
+// cambia directo.
+let floorAnimating = false;
+const FLOOR_CUBE_MS = 700;
+
 function switchFloor(f, btn) {
-  currentFloor = f;
-  document.querySelectorAll('.floor').forEach(el=>el.classList.remove('active'));
-  document.getElementById(`floor-${f}`).classList.add('active');
+  if (floorAnimating) return;
+  const prev = currentFloor;
+  const outEl = document.getElementById(`floor-${prev}`);
+  const inEl  = document.getElementById(`floor-${f}`);
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+
+  const sinAnimacion = f === prev || !outEl.animate ||
+    (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  if (sinAnimacion) {
+    currentFloor = f;
+    document.querySelectorAll('.floor').forEach(el=>el.classList.remove('active'));
+    inEl.classList.add('active');
+    applyFilters();
+    document.getElementById('scrollCollapseGroup')?.classList.remove('collapsed');
+    requestAnimationFrame(() => requestAnimationFrame(() => { aplicarZoom(); buildMinimap(); }));
+    return;
+  }
+
+  const dir = (f === 'pa') ? 1 : -1;   // Baja → Alta gira hacia un lado, Alta → Baja hacia el otro
+  const r = outEl.getBoundingClientRect();
+  floorAnimating = true;
+  currentFloor = f;
+
+  // La planta que sale queda fija en su lugar mientras gira
+  Object.assign(outEl.style, {
+    position: 'fixed', left: r.left + 'px', top: r.top + 'px',
+    width: r.width + 'px', height: r.height + 'px',
+    display: 'flex', flexDirection: 'column', zIndex: '5', opacity: '1', animation: 'none'
+  });
+  outEl.classList.remove('active');
+
+  // La que entra pasa a ser la activa (sin su fade de siempre, lo reemplaza el cubo)
+  inEl.style.animation = 'none';
+  inEl.classList.add('active');
   applyFilters();
   document.getElementById('scrollCollapseGroup')?.classList.remove('collapsed');
-  // Esperamos al próximo repintado real (en vez de un setTimeout con tiempo fijo)
-  // para que el piso ya esté visible y con su layout final antes de reaplicar el zoom.
-  requestAnimationFrame(() => requestAnimationFrame(() => { aplicarZoom(); buildMinimap(); }));
+  aplicarZoom(); buildMinimap();
+
+  // Barras de scroll invisibles mientras dura el deslizamiento (ver CSS .floor-sliding)
+  document.body.classList.add('floor-sliding');
+
+  const opts  = { duration: FLOOR_CUBE_MS, easing: 'cubic-bezier(.3,.7,.2,1)' };
+  const animOut = outEl.animate([
+    { transform: 'translateX(0)', opacity: 1 },
+    { transform: `translateX(${-12*dir}%)`, opacity: 0 }
+  ], { ...opts, fill: 'forwards' });
+  const animIn = inEl.animate([
+    { transform: `translateX(${12*dir}%)`, opacity: 0 },
+    { transform: 'translateX(0)', opacity: 1 }
+  ], opts);
+
+  let terminado = false;
+  const terminar = () => {
+    if (terminado) return;
+    terminado = true;
+    animOut.cancel();
+    outEl.removeAttribute('style');
+    document.body.classList.remove('floor-sliding');
+    // OJO: no restaurar inEl.style.animation. Si se vuelve a '', reaparece el fade
+    // de .floor.active y la planta parpadea justo al terminar el deslizamiento.
+    floorAnimating = false;
+    aplicarZoom(); buildMinimap();
+  };
+  animIn.onfinish = terminar;
+  setTimeout(terminar, FLOOR_CUBE_MS + 400); // seguro por si la pestaña estaba en segundo plano
 }
 
-// Los 3 filtros rápidos (mobiliario / disponible / no ingresaron) son
+// Los filtros rápidos (mobiliario / disponible / no ingresaron / no firmaron) son
 // mutuamente excluyentes, tipo radio-button: activar uno desactiva los
-// otros dos, y volver a tocar el que ya está activo lo apaga (sin filtro).
-let currentFilter = 'todos'; // 'todos' | 'mobiliario' | 'disponible' | 'noIngresados'
+// otros, y volver a tocar el que ya está activo lo apaga (sin filtro).
+let currentFilter = 'todos'; // 'todos' | 'mobiliario' | 'disponible' | 'noIngresados' | 'noFirmaron'
 
 function toggleFiltro(tipo, btn) {
   const desactivar = (currentFilter === tipo);
@@ -2512,6 +2825,7 @@ function applyFilters() {
                  : currentFilter==='mobiliario'    ? el.dataset.mob==='SI'
                  : currentFilter==='disponible'    ? el.dataset.e==='Disponible'
                  : currentFilter==='noIngresados'  ? ((el.dataset.e==='Pagado' || el.dataset.e==='Señado') && el.dataset.ingreso!=='SI')
+                 : currentFilter==='noFirmaron'    ? ((el.dataset.e==='Pagado' || el.dataset.e==='Señado') && el.dataset.contrato!=='SI')
                  : true;
     const matchS    = !q || el.dataset.num.includes(q) || (el.dataset.rb||'').toLowerCase().includes(q) || (el.dataset.n||'').toLowerCase().includes(q);
     const matchMine = !soloMisVentas || (el.dataset.resp||'').toLowerCase() === (CURRENT_USER||'').toLowerCase();
@@ -3996,9 +4310,11 @@ function activarSesion(user, perfil) {
       perfilBadge.style.display = 'none';
     }
   }
-  // Filtro rápido "No ingresaron": solo visible para Admin (perfil 3)
+  // Filtros rápidos "No ingresaron" y "No firmaron": solo visibles para Admin (perfil 3)
   const noIngresadosBtn = document.getElementById('filtroNoIngresadosBtn');
   if (noIngresadosBtn) noIngresadosBtn.style.display = (CURRENT_PERFIL === 3) ? '' : 'none';
+  const noFirmaronBtn = document.getElementById('filtroNoFirmaronBtn');
+  if (noFirmaronBtn) noFirmaronBtn.style.display = (CURRENT_PERFIL === 3) ? '' : 'none';
   resetIngresoFlip(); // arranque de la app: la tarjeta de ocupación empieza mostrando stands
   load(); // carga el mapa recién después del login
   iniciarPolling(); // a partir de ahora, chequea cada CHEQUEO_MS si hubo cambios
@@ -4207,7 +4523,7 @@ async function cargarPago() {
 // ── ALTA FERIANTE ─────────────────────────────────────────────────────────────
 function openAltaPanel() {
   // Limpiar formulario
-  ['altaNombre','altaRubro','altaCelular','altaEmail','altaIG','altaDNI'].forEach(id => {
+  ['altaNombre','altaRubro','altaCelular','altaEmail','altaIG'].forEach(id => {
     document.getElementById(id).value = '';
   });
   document.getElementById('altaTipo').value = '';
@@ -4252,7 +4568,6 @@ async function guardarNuevoFeriante() {
   const celular = document.getElementById('altaCelular').value.trim();
   const email   = document.getElementById('altaEmail').value.trim();
   const ig      = document.getElementById('altaIG').value.trim();
-  const dni     = document.getElementById('altaDNI').value.trim();
 
   // Validaciones
   if (!nombre) { msgEl.textContent = 'El Nombre y Apellido es obligatorio.'; msgEl.className = 'alta-msg err'; return; }
@@ -4276,7 +4591,6 @@ async function guardarNuevoFeriante() {
       celular,
       email,
       ig,
-      dni,
       user:    CURRENT_USER
     });
     const res  = await fetch(`${API_URL}?${params.toString()}`);
