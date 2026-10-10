@@ -4230,9 +4230,54 @@ function procesarLoginExitoso(user, perfil, meses) {
   MESES_PENDIENTES = { user, perfil };
   const sel = document.getElementById('mesSelect');
   sel.innerHTML = meses.map(m => `<option value="${m.clave}">${m.mes}</option>`).join('');
-  document.getElementById('loginScreen').classList.add('hidden');
-  document.getElementById('mesScreen').classList.remove('hidden');
+  transicionLoginAMes();
 }
+
+// ── TRANSICIÓN "ATRAVESAR": login → selector de mes ─────────────────────────
+// La tarjeta del login se agranda y se desenfoca hasta desvanecerse (como si
+// la cruzaras hacia adelante) y la del mes aparece desde el fondo, creciendo
+// hasta su tamaño. Las dos pantallas comparten el mismo fondo, así que
+// mientras dura la animación el de arriba (mesScreen) se vuelve transparente
+// para que se vea la tarjeta del login saliendo por debajo.
+function transicionLoginAMes() {
+  const login = document.getElementById('loginScreen');
+  const mes   = document.getElementById('mesScreen');
+  const cardA = login.querySelector('.login-card');
+  const cardB = mes.querySelector('.login-card');
+
+  const cambioSeco = () => { login.classList.add('hidden'); mes.classList.remove('hidden'); };
+  const sinAnim = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+               || !cardA || !cardB || !cardA.animate;
+  if (sinAnim) { cambioSeco(); return; }
+
+  mes.classList.remove('hidden');
+  mes.style.background = 'transparent';   // deja ver el login por debajo
+  mes.style.pointerEvents = 'none';       // sin taps mientras anima
+  cardB.style.animation = 'none';         // anulamos la entrada CSS (loginCardIn)
+
+  const salida = cardA.animate([
+    { transform: 'scale(1)',   opacity: 1, filter: 'blur(0)'   },
+    { transform: 'scale(2.4)', opacity: 0, filter: 'blur(8px)' }
+  ], { duration: 520, easing: 'cubic-bezier(.5,0,.9,.4)', fill: 'forwards' });
+
+  const entrada = cardB.animate([
+    { transform: 'scale(.6)', opacity: 0 },
+    { transform: 'scale(1)',  opacity: 1 }
+  ], { duration: 520, delay: 250, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'both' });
+
+  entrada.finished.then(() => {
+    login.classList.add('hidden');
+    mes.style.background = '';
+    mes.style.pointerEvents = '';
+    cardB.style.animation = '';
+    salida.cancel(); entrada.cancel();
+  }).catch(() => {
+    // Animación interrumpida: nos aseguramos de no dejar nada trabado
+    login.classList.add('hidden');
+    mes.style.background = ''; mes.style.pointerEvents = ''; cardB.style.animation = '';
+  });
+}
+
 
 function confirmarMes() {
   if (!MESES_PENDIENTES) return;
