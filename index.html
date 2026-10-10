@@ -720,6 +720,26 @@
     animation: spin .7s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Carga con "stands encendiéndose": mini mapa 4x4 cuyos puestos se prenden
+     en diagonal (verde = pagado, amarillo = señado), igual que los estados
+     del mapa real. Reemplaza a la ruedita (.loading-spinner). */
+  .loading-stands {
+    --st-off: #e5e5ea;
+    display: grid; grid-template-columns: repeat(4, 16px); gap: 5px;
+    padding: 6px 0;
+  }
+  .loading-stands i {
+    width: 16px; height: 16px; border-radius: 4px; background: var(--st-off);
+    animation: standLit 1.6s ease-in-out infinite;
+    animation-delay: calc(var(--d) * .14s);
+  }
+  @keyframes standLit {
+    0%, 100% { background: var(--st-off); transform: scale(1); }
+    30%      { background: #30d158;       transform: scale(1.18); }
+    60%      { background: #ffd60a;       transform: scale(1); }
+  }
+  html[data-theme="dark"] .loading-stands { --st-off: #2c3a52; }
   .loading-text { font-size: 14px; font-weight: 600; color: var(--text2); text-align: center; }
   .loading-bar-wrap { width: 140px; height: 4px; background: #e5e5ea; border-radius: 2px; overflow: hidden; }
   .loading-bar { height: 100%; width: 0%; background: var(--accent); border-radius: 2px; transition: width .4s ease; }
@@ -1974,7 +1994,7 @@ html[data-theme="dark"] .filtros-sheet .search-filters-row { background: transpa
 <!-- LOADING OVERLAY -->
 <div id="loadingOverlay">
   <div class="loading-card">
-    <div class="loading-spinner"></div>
+    <div class="loading-stands"><i style="--d:0"></i><i style="--d:1"></i><i style="--d:2"></i><i style="--d:3"></i><i style="--d:1"></i><i style="--d:2"></i><i style="--d:3"></i><i style="--d:4"></i><i style="--d:2"></i><i style="--d:3"></i><i style="--d:4"></i><i style="--d:5"></i><i style="--d:3"></i><i style="--d:4"></i><i style="--d:5"></i><i style="--d:6"></i></div>
     <div class="loading-text" id="loadingText">Guardando...</div>
     <div class="loading-bar-wrap"><div class="loading-bar" id="loadingBar"></div></div>
   </div>
