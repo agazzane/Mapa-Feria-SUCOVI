@@ -1519,6 +1519,38 @@ header p { color: rgba(255,255,255,.75); }
 .zoom-btn { color: var(--ind); }
 .zoom-btn:active { background: var(--ind-soft); }
 
+/* ── FILTROS: lupa flotante + panel desde abajo ── */
+.filtros-fab {
+  position: fixed; left: 16px; bottom: 28px; z-index: 150;
+  width: 48px; height: 48px; border-radius: 50%; border: none;
+  background: var(--ind); color: #fff; font-size: 19px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 20px rgba(58,31,180,.4); -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease;
+}
+.filtros-fab:active { transform: scale(.94); }
+.filtros-fab:focus-visible { outline: 3px solid var(--ind); outline-offset: 3px; }
+.filtros-fab-dot { display: none; position: absolute; top: 1px; right: 1px; width: 13px; height: 13px; border-radius: 50%; background: #ffd43b; border: 2px solid #fff; }
+.filtros-fab.has-filter .filtros-fab-dot { display: block; }
+.filtros-scrim { position: fixed; inset: 0; z-index: 170; background: rgba(29,27,58,.28); opacity: 0; pointer-events: none; transition: opacity .22s ease; }
+.filtros-scrim.open { opacity: 1; pointer-events: auto; }
+.filtros-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 180; max-width: 640px; margin: 0 auto;
+  background: #fff; border-radius: 26px 26px 0 0; padding: 10px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -10px 32px rgba(29,27,58,.25);
+  transform: translateY(105%); visibility: hidden;
+  transition: transform .26s cubic-bezier(.3,.7,.2,1), visibility 0s linear .26s;
+}
+.filtros-sheet.open { transform: none; visibility: visible; transition: transform .26s cubic-bezier(.3,.7,.2,1), visibility 0s; }
+.filtros-grab { width: 38px; height: 4px; border-radius: 4px; background: var(--line); margin: 0 auto 10px; }
+.filtros-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+.filtros-sheet .search-filters-row { display: grid; gap: 10px; padding: 0; background: transparent; border: none; }
+.filtros-sheet .search-wrap-compact { flex: none; max-width: none; width: 100%; height: 42px; }
+.filtros-sheet .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; overflow: visible; }
+.filtros-sheet .filter-btn { padding: 13px 10px; font-size: 13px; border-radius: 16px; white-space: normal; }
+html[data-theme="dark"] .filtros-sheet { background: #1b273b; }
+html[data-theme="dark"] .filtros-sheet .search-filters-row { background: transparent; border: none; }
+
 /* ── MODAL (cabecera índigo) ── */
 .modal-overlay { background: rgba(29,27,58,.5); }
 .modal {
@@ -1792,20 +1824,6 @@ header p { color: rgba(255,255,255,.75); }
   <button class="tab-btn"        onclick="switchFloor('pa', this)">🏢 Planta Alta</button>
 </div>
 
-<!-- ── BUSCADOR + FILTROS (una sola línea) ── -->
-<div class="search-filters-row">
-  <div class="search-wrap-compact">
-    <span class="search-icon">🔍</span>
-    <input type="search" id="searchInput" placeholder="Buscar..." oninput="applyFilters()">
-  </div>
-  <div class="filters" id="filterBar">
-    <button class="filter-btn" id="filtroMobBtn"  onclick="toggleFiltro('mobiliario', this)">🪑 Con mobiliario</button>
-    <button class="filter-btn" id="filtroDispBtn" onclick="toggleFiltro('disponible', this)">🔓 Disponible</button>
-    <button class="filter-btn" id="filtroNoIngresadosBtn" style="display:none" onclick="toggleFiltro('noIngresados', this)">🚪 No ingresaron</button>
-    <button class="filter-btn" id="filtroNoFirmaronBtn" style="display:none" onclick="toggleFiltro('noFirmaron', this)">✍️ No firmaron</button>
-  </div>
-</div>
-
 </div>
 </div>
 
@@ -1912,6 +1930,26 @@ header p { color: rgba(255,255,255,.75); }
 <div class="minimap" id="minimap" onclick="minimapJump(event)" title="Tocá para saltar a esa zona del mapa">
   <div class="minimap-dots" id="minimapDots"></div>
   <div class="minimap-viewport" id="minimapViewport"></div>
+</div>
+
+<!-- ── FILTROS: lupa flotante + panel que sube desde abajo ── -->
+<button class="filtros-fab" id="filtrosFab" type="button" aria-label="Buscar y filtrar" aria-expanded="false" aria-controls="filtrosSheet" onclick="toggleFiltrosSheet()">🔍<i class="filtros-fab-dot"></i></button>
+<div class="filtros-scrim" id="filtrosScrim" onclick="closeFiltrosSheet()"></div>
+<div class="filtros-sheet" id="filtrosSheet" role="dialog" aria-label="Buscar y filtrar">
+  <div class="filtros-grab"></div>
+  <div class="filtros-title">Buscar y filtrar</div>
+  <div class="search-filters-row">
+    <div class="search-wrap-compact">
+      <span class="search-icon">🔍</span>
+      <input type="search" id="searchInput" placeholder="Buscar..." oninput="applyFilters()">
+    </div>
+    <div class="filters" id="filterBar">
+      <button class="filter-btn" id="filtroMobBtn"  onclick="toggleFiltro('mobiliario', this)">🪑 Con mobiliario</button>
+      <button class="filter-btn" id="filtroDispBtn" onclick="toggleFiltro('disponible', this)">🔓 Disponible</button>
+      <button class="filter-btn" id="filtroNoIngresadosBtn" style="display:none" onclick="toggleFiltro('noIngresados', this)">🚪 No ingresaron</button>
+      <button class="filter-btn" id="filtroNoFirmaronBtn" style="display:none" onclick="toggleFiltro('noFirmaron', this)">✍️ No firmaron</button>
+    </div>
+  </div>
 </div>
 
 <!-- TOAST CONTAINER -->
@@ -2808,7 +2846,22 @@ function toggleFiltro(tipo, btn) {
     btn.classList.add('active');
   }
   applyFilters();
+  closeFiltrosSheet();   // el panel se cierra solo al elegir (o quitar) un filtro
 }
+
+// ── FILTROS: lupa flotante + panel que sube desde abajo ──────────────────────
+function setFiltrosSheet(open) {
+  document.getElementById('filtrosSheet').classList.toggle('open', open);
+  document.getElementById('filtrosScrim').classList.toggle('open', open);
+  document.getElementById('filtrosFab').setAttribute('aria-expanded', String(open));
+}
+function openFiltrosSheet()   { setFiltrosSheet(true); }
+function closeFiltrosSheet()  { setFiltrosSheet(false); }
+function toggleFiltrosSheet() { setFiltrosSheet(!document.getElementById('filtrosSheet').classList.contains('open')); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFiltrosSheet(); });
+document.getElementById('searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.target.blur(); closeFiltrosSheet(); }   // Enter = ver resultados
+});
 
 function toggleMisVentas(btn) {
   soloMisVentas = !soloMisVentas;
@@ -2820,6 +2873,7 @@ function applyFilters() {
   const q = document.getElementById('searchInput').value.toLowerCase().trim();
   const gridId = currentFloor==='pb' ? 'grid-pb' : 'grid-pa';
   const anyActive = currentFilter !== 'todos' || soloMisVentas || !!q;
+  document.getElementById('filtrosFab')?.classList.toggle('has-filter', anyActive);   // puntito sobre la lupa
   document.querySelectorAll(`#${gridId} .stand`).forEach(el => {
     const matchF = currentFilter==='todos'        ? true
                  : currentFilter==='mobiliario'    ? el.dataset.mob==='SI'
