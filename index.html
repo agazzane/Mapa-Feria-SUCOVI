@@ -5423,7 +5423,7 @@ function textoPrecioMobAdicional(label) {
   return p ? '$' + p.toLocaleString('es-AR') : '';
 }
 function switchPrecioFeriaHTML() {
-  const titulo = '<div class="feria-switch-title">🎪 Precio de feria</div>';
+  const titulo = '<div class="feria-switch-title">Precio venta en feria</div>';
   if (!hayPreciosFeriaCargados()) {
     return '<div class="feria-switch-row">' + '<div>' + titulo +
       '<div class="feria-switch-sub">No hay precios de feria cargados (hoja PRECIOS, columna C)</div></div></div>';
@@ -5431,7 +5431,7 @@ function switchPrecioFeriaHTML() {
   const on = mobAdicionalFeria;
   return `<div class="feria-switch-row${on ? ' on' : ''}" id="feriaSwitchRow"><div>${titulo}` +
     `<div class="feria-switch-sub" id="feriaSwitchSub">${on ? 'Aplicando precios de feria' : 'Precio normal'}</div></div>` +
-    `<button type="button" class="feria-switch" id="feriaSwitchBtn" role="switch" aria-checked="${on}" aria-label="Precio de feria" onclick="toggleMobAdicionalFeria()"></button></div>`;
+    `<button type="button" class="feria-switch" id="feriaSwitchBtn" role="switch" aria-checked="${on}" aria-label="Precio venta en feria" onclick="toggleMobAdicionalFeria()"></button></div>`;
 }
 function toggleMobAdicionalFeria() { setMobAdicionalFeria(!mobAdicionalFeria); }
 function setMobAdicionalFeria(on) {
