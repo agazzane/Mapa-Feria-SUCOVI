@@ -1962,6 +1962,20 @@ html[data-theme="dark"] .success-chk-core {background: #30D158; box-shadow: 0 0 
   header .header-refresh-btn { grid-column: 3; grid-row: 3; justify-self: end; }
   header .theme-toggle-btn { grid-column: 4; grid-row: 3; }
 }
+  /* ── TOOLTIP DE COMENTARIO EN STANDS (solo PC, con mouse) ── */
+  #standComTip { position: fixed; z-index: 1600; display: none; max-width: min(280px, calc(100vw - 16px)); padding: 8px 11px; border-radius: 10px; background: rgba(28,28,30,.96); color: #fff; border: 1px solid rgba(255,255,255,.14); box-shadow: 0 8px 32px rgba(0,0,0,.28); pointer-events: none; font-family: var(--font); animation: sctIn .14s ease-out; }
+  #standComTip .sct-head { font-size: 11px; font-weight: 700; opacity: .65; margin-bottom: 3px; letter-spacing: .2px; }
+  #standComTip .sct-body { font-size: 13px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: hidden; }
+  @keyframes sctIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+  /* ── INTERRUPTOR DE PRECIO DE FERIA (panel de mob. adicional) ── */
+  .feria-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; margin-bottom: 10px; border-radius: 12px; border: 1px solid var(--border); background: rgba(127,127,127,.08); transition: background .2s, border-color .2s; }
+  .feria-switch-row.on { background: rgba(255,159,10,.16); border-color: rgba(255,159,10,.5); }
+  .feria-switch-title { font-size: 14px; font-weight: 700; }
+  .feria-switch-sub { font-size: 12px; opacity: .7; margin-top: 1px; }
+  .feria-switch { position: relative; flex-shrink: 0; width: 46px; height: 28px; padding: 0; border: none; border-radius: 100px; background: #9ca3af; cursor: pointer; transition: background .2s; -webkit-tap-highlight-color: transparent; }
+  .feria-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .2s; }
+  .feria-switch[aria-checked="true"] { background: #f59e0b; }
+  .feria-switch[aria-checked="true"]::after { transform: translateX(18px); }
 </style>
 </head>
 <body>
@@ -2593,7 +2607,7 @@ let lastTap = 0;
 document.addEventListener('touchend', e => { const now=Date.now(); if(now-lastTap<300) e.preventDefault(); lastTap=now; }, {passive:false});
 
 // ── VERSIÓN DE LA APP ────────────────────────────────────────────────────────
-const APP_VERSION = 'v3.11';   // ← cambiá solo acá
+const APP_VERSION = 'v3.12';   // ← cambiá solo acá
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   const hv = document.getElementById('headerVersion');
@@ -2609,7 +2623,12 @@ let LISTA_NEGRA = [];      // nombres normalizados (sin tildes, minúsculas, sin
 let VENDEDORES_LIST = [];  // solo usuarios con perfil 1, para el Admin
 let currentStandId = null;
 let soloMisVentas  = false;
-let PRECIOS_MOB    = {};   // { 'Mesa': 1500, 'Pupitre Doble': 2000, ... }
+let PRECIOS_MOB    = {};   // { 'Mesa': 1500, 'Pupitre Doble': 2000, ... }  (precio anticipado)
+let PRECIOS_MOB_FERIA = {}; // mismos ítems, pero con el precio del día de la feria (col C de PRECIOS)
+
+// Interruptor del panel de Mob. Adicional: arranca SIEMPRE en precio normal (false).
+// Se vuelve a poner en false cada vez que se abre la ficha de un stand.
+let mobAdicionalFeria = false;
 
 // Normaliza nombres para comparar sin importar mayúsculas, tildes o espacios extra
 function normalizarNombre(s) {
@@ -2668,6 +2687,7 @@ async function load(silencioso = false) {
     if (FULL_DATA.feriantes)  FERIANTES_LIST = FULL_DATA.feriantes;
     if (FULL_DATA.listaNegra) LISTA_NEGRA    = FULL_DATA.listaNegra.map(normalizarNombre);
     if (FULL_DATA.precios)    PRECIOS_MOB    = FULL_DATA.precios;
+    PRECIOS_MOB_FERIA = FULL_DATA.preciosFeria || {};
     // Usuarios/vendedores: para que el combo Admin esté disponible
     // independientemente de si hay sesión guardada o no
     if (FULL_DATA.usuarios) {
@@ -5358,6 +5378,7 @@ function resetMobAdicionalQty() {
 }
 
 function resetMobAdicionalUI() {
+  mobAdicionalFeria = false;   // siempre arranca en precio normal
   resetMobAdicionalQty();
   document.getElementById('mobAdicionalSummary').classList.remove('visible');
   document.getElementById('mobAdicionalSummaryText').textContent = '';
@@ -5383,19 +5404,64 @@ function resetMobAdicionalUI() {
   });
 }
 
+// ── PRECIO DE FERIA (solo mobiliario adicional, con interruptor manual) ──────
+function hayPreciosFeriaCargados() {
+  return Object.keys(PRECIOS_MOB_FERIA).length > 0;
+}
+function hayPrecioFeria() {
+  return mobAdicionalFeria && hayPreciosFeriaCargados();
+}
+// Precio de un ítem: el de feria si el interruptor está activo y el ítem lo tiene; si no, el normal.
+function precioMobAdicional(label) {
+  const normal = PRECIOS_MOB[label] || 0;
+  if (!hayPrecioFeria()) return normal;
+  const feria = Number(PRECIOS_MOB_FERIA[label]) || 0;
+  return feria > 0 ? feria : normal;
+}
+function textoPrecioMobAdicional(label) {
+  const p = precioMobAdicional(label);
+  return p ? '$' + p.toLocaleString('es-AR') : '';
+}
+function switchPrecioFeriaHTML() {
+  const titulo = '<div class="feria-switch-title">🎪 Precio de feria</div>';
+  if (!hayPreciosFeriaCargados()) {
+    return '<div class="feria-switch-row">' + '<div>' + titulo +
+      '<div class="feria-switch-sub">No hay precios de feria cargados (hoja PRECIOS, columna C)</div></div></div>';
+  }
+  const on = mobAdicionalFeria;
+  return `<div class="feria-switch-row${on ? ' on' : ''}" id="feriaSwitchRow"><div>${titulo}` +
+    `<div class="feria-switch-sub" id="feriaSwitchSub">${on ? 'Aplicando precios de feria' : 'Precio normal'}</div></div>` +
+    `<button type="button" class="feria-switch" id="feriaSwitchBtn" role="switch" aria-checked="${on}" aria-label="Precio de feria" onclick="toggleMobAdicionalFeria()"></button></div>`;
+}
+function toggleMobAdicionalFeria() { setMobAdicionalFeria(!mobAdicionalFeria); }
+function setMobAdicionalFeria(on) {
+  mobAdicionalFeria = !!on && hayPreciosFeriaCargados();
+  const row = document.getElementById('feriaSwitchRow');
+  const btn = document.getElementById('feriaSwitchBtn');
+  const sub = document.getElementById('feriaSwitchSub');
+  if (row) row.classList.toggle('on', mobAdicionalFeria);
+  if (btn) btn.setAttribute('aria-checked', mobAdicionalFeria ? 'true' : 'false');
+  if (sub) sub.textContent = mobAdicionalFeria ? 'Aplicando precios de feria' : 'Precio normal';
+  MOB_ITEMS.forEach(m => {
+    const el = document.getElementById('mapre_' + m.key);
+    if (el) el.textContent = textoPrecioMobAdicional(m.label);
+  });
+  updateMobAdicionalSummary();   // recalcula total y monto con los precios vigentes
+}
+
 function calcTotalMobAdicional() {
   return MOB_ITEMS.reduce((sum, m) => {
     const qty   = mobAdicionalQty[m.key] || 0;
-    const price = PRECIOS_MOB[m.label] || 0;
+    const price = precioMobAdicional(m.label) || 0;
     return sum + qty * price;
   }, 0);
 }
 
 function openMobAdicionalPanel() {
   const list = document.getElementById('mobAdicionalList');
-  list.innerHTML = MOB_ITEMS.map(m => {
-    const precio = PRECIOS_MOB[m.label];
-    const precioStr = precio ? `<span style="font-size:12px;color:#64748b;font-weight:500">$${precio.toLocaleString('es-AR')}</span>` : '';
+  list.innerHTML = switchPrecioFeriaHTML() + MOB_ITEMS.map(m => {
+    const precio = precioMobAdicional(m.label);
+    const precioStr = `<span id="mapre_${m.key}" style="font-size:12px;color:#64748b;font-weight:500">${precio ? '$' + precio.toLocaleString('es-AR') : ''}</span>`;
     return `
     <div class="mob-item">
       <div class="mob-item-name">${m.label} ${precioStr}</div>
@@ -5438,7 +5504,7 @@ function updateMobAdicionalSummary() {
     const txt   = items.map(m => `${m.label} ×${mobAdicionalQty[m.key]}`).join(' · ');
     const total = calcTotalMobAdicional();
     summaryTxt.textContent = txt;
-    totalEl.textContent    = total > 0 ? `Total: $${total.toLocaleString('es-AR')}` : '';
+    totalEl.textContent    = total > 0 ? `Total: $${total.toLocaleString('es-AR')}${hayPrecioFeria() ? ' · precio de feria' : ''}` : '';
     summaryEl.classList.add('visible');
     btnLabel.textContent = `(${items.length} tipo${items.length>1?'s':''})`;
     montoInput.value = total > 0 ? total : '';
@@ -5475,7 +5541,7 @@ async function venderMobAdicional() {
   setBtnBusy(btn, 'Guardando...');
 
   // Armar descripción del mob para la leyenda
-  const mobDesc = items.map(m => `${mobAdicionalQty[m.key]}×${m.label}`).join(' + ');
+  const mobDesc = items.map(m => `${mobAdicionalQty[m.key]}×${m.label}`).join(' + ') + (hayPrecioFeria() ? ' [Precio feria]' : '');
 
   try {
     const mobParams = MOB_ITEMS.map(m => `${m.key}=${mobAdicionalQty[m.key]||0}`).join('&');
@@ -5767,6 +5833,73 @@ async function darIngreso() {
     clearBtnBusy(btn, '🚪 Dar ingreso');
   }
 }
+
+// ── TOOLTIP DE COMENTARIO EN STANDS ─────────────────────────────────────────
+// Solo PC (mouse): dejar el cursor ~0,7 s sobre un stand con comentario.
+// En celular/tablet (táctil) no hace nada: todo queda como estaba.
+// Solo perfiles 1 (Vendedor) y 3 (Admin), igual que el panel de comentarios.
+(function() {
+  const HOVER_MS = 700;
+  const canHover = window.matchMedia('(hover: hover) and (pointer: fine)');
+  const tip = document.createElement('div');
+  tip.id = 'standComTip';
+  tip.setAttribute('role', 'tooltip');
+  const tipHead = document.createElement('div'); tipHead.className = 'sct-head';
+  const tipBody = document.createElement('div'); tipBody.className = 'sct-body';
+  tip.append(tipHead, tipBody);
+  document.body.appendChild(tip);
+
+  let hoverTimer = null, watchTimer = null, curEl = null;
+
+  const puedeVer = () => CURRENT_PERFIL === 1 || CURRENT_PERFIL === 3;
+  const comDe = num => {
+    const ex = ((FULL_DATA || {}).extraData || {})[num];
+    return ex && ex.com ? String(ex.com).trim() : '';
+  };
+  const standDe = t => (t && t.closest) ? t.closest('.stand') : null;
+
+  function hide() {
+    clearTimeout(hoverTimer); clearInterval(watchTimer);
+    hoverTimer = watchTimer = null;
+    tip.style.display = 'none';
+  }
+
+  function show(st) {
+    const num = st.dataset.num, txt = comDe(num);
+    if (!txt || !puedeVer()) return;
+    // textContent (no innerHTML): el comentario es texto libre cargado por usuarios
+    tipHead.textContent = `📝 Stand ${num}` + (st.dataset.n ? ` · ${st.dataset.n}` : '');
+    tipBody.textContent = txt;
+    tip.style.visibility = 'hidden';
+    tip.style.display = 'block';
+    const r = st.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight, m = 8, gap = 8;
+    let top = r.top - h - gap;                       // preferido: arriba del stand
+    if (top < m) top = r.bottom + gap;               // sin lugar arriba: abajo
+    top = Math.max(m, Math.min(top, window.innerHeight - h - m));
+    const left = Math.max(m, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - m));
+    tip.style.left = left + 'px';
+    tip.style.top  = top + 'px';
+    tip.style.visibility = 'visible';
+    // si el mapa se redibuja (polling) y el stand desaparece, no dejar el cartel colgado
+    clearInterval(watchTimer);
+    watchTimer = setInterval(() => { if (!st.isConnected) hide(); }, 400);
+  }
+
+    document.addEventListener('mouseover', e => {
+    if (!canHover.matches) return;                   // evita el "mouseover" simulado al tocar en celular
+    const st = standDe(e.target);
+    if (st === curEl) return;
+    hide(); curEl = st;
+    if (!st || !puedeVer() || !comDe(st.dataset.num)) return;
+    hoverTimer = setTimeout(() => show(st), HOVER_MS);
+  });
+  document.addEventListener('mouseout', e => {
+    if (curEl && !(e.relatedTarget && curEl.contains(e.relatedTarget))) { hide(); curEl = null; }
+  });
+  ['mousedown', 'wheel', 'keydown'].forEach(ev => document.addEventListener(ev, hide, true));
+  document.addEventListener('scroll', hide, true);
+  window.addEventListener('resize', hide);
+})();
 
 initLogin();
 
