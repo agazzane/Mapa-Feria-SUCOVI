@@ -5545,7 +5545,7 @@ async function venderMobAdicional() {
 
   try {
     const mobParams = MOB_ITEMS.map(m => `${m.key}=${mobAdicionalQty[m.key]||0}`).join('&');
-    const url = `${API_URL}?tipo=mobadic&mes=${encodeURIComponent(CURRENT_MES)}&stand=${encodeURIComponent(currentStandId)}&monto=${total}&medio=${encodeURIComponent(medio)}&user=${encodeURIComponent(CURRENT_USER)}&mobdesc=${encodeURIComponent(mobDesc)}&${mobParams}`;
+    const url = `${API_URL}?tipo=mobadic&mes=${encodeURIComponent(CURRENT_MES)}&stand=${encodeURIComponent(currentStandId)}&monto=${total}${hayPrecioFeria() ? '&feria=1' : ''}&medio=${encodeURIComponent(medio)}&user=${encodeURIComponent(CURRENT_USER)}&mobdesc=${encodeURIComponent(mobDesc)}&${mobParams}`;
     const res  = await fetch(url);
     const data = await res.json();
     if (data.ok) {
@@ -5566,7 +5566,12 @@ async function venderMobAdicional() {
 
       msgEl.textContent = '';
       msgEl.className = 'mob-adicional-msg';
-      showToast('✅ Mobiliario adicional registrado');
+      if (data.ajusteFeria && data.ajusteFeria.error) {
+        // La venta quedó registrada, pero el total a abonar (AH) no se pudo ajustar: hay que corregirlo a mano.
+        showToast('⚠️ Venta registrada, pero NO se ajustó el total a abonar en el Excel: ' + data.ajusteFeria.error, 'err', 10000);
+      } else {
+        showToast('✅ Mobiliario adicional registrado');
+      }
       clearBtnBusy(btn, 'Registrar venta de mobiliario');
       renderMapUI();
       document.getElementById('modalOverlay').classList.remove('open');
