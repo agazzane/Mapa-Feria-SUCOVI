@@ -2607,7 +2607,7 @@ let lastTap = 0;
 document.addEventListener('touchend', e => { const now=Date.now(); if(now-lastTap<300) e.preventDefault(); lastTap=now; }, {passive:false});
 
 // ── VERSIÓN DE LA APP ────────────────────────────────────────────────────────
-const APP_VERSION = 'v3.12';   // ← cambiá solo acá
+const APP_VERSION = 'v3.13';   // ← cambiá solo acá
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   const hv = document.getElementById('headerVersion');
@@ -3980,9 +3980,46 @@ function playToastSound() {
   _successTone(ctx, 1175, t + 0.42, 0.35, { type: 'sine',     gain: 0.06 }); // cola/eco suave
 }
 
+// ── SONIDO DE FIRMA DE CONTRATO (mp3 del repo de GitHub) ─────────────────────
+// Reemplaza al sonido sintetizado SOLO cuando se confirma una firma de contrato.
+// Si el mp3 no carga o el navegador bloquea la reproducción, cae al sonido de siempre.
+const CONTRATO_SOUND_URL = 'https://raw.githubusercontent.com/agazzane/Mapa-Feria-SUCOVI/main/Pefeto%20Cabashedo.MP3';
+let _contratoAudio = null;
+
+function _getContratoAudio() {
+  if (!_contratoAudio) {
+    _contratoAudio = new Audio(CONTRATO_SOUND_URL);
+    _contratoAudio.preload = 'auto';
+  }
+  return _contratoAudio;
+}
+
+// Se llama apenas se toca el botón (dentro del gesto del usuario): en iOS/Safari
+// el audio solo se "desbloquea" así, y después el play() posterior a la respuesta
+// del servidor ya no es rechazado. Va en silencio (muted) y se frena enseguida.
+function primeContratoSound() {
+  try {
+    const a = _getContratoAudio();
+    a.muted = true;
+    const p = a.play();
+    const done = () => { a.pause(); a.currentTime = 0; a.muted = false; };
+    if (p && p.then) p.then(done, () => { a.muted = false; }); else done();
+  } catch (e) {}
+}
+
+function playContratoSound() {
+  try {
+    const a = _getContratoAudio();
+    a.muted = false;
+    a.currentTime = 0;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => playToastSound());
+  } catch (e) { playToastSound(); }
+}
+
 // ── TOAST ────────────────────────────────────────────────────────────────────
 let _toastTimer = null;
-function showToast(msg, type = 'ok', duration = 2500) {
+function showToast(msg, type = 'ok', duration = 2500, soundFn = null) {
   const container = document.getElementById('toastContainer');
   const existing  = container.querySelector('.toast');
   if (existing) existing.remove();
@@ -3992,7 +4029,7 @@ function showToast(msg, type = 'ok', duration = 2500) {
   el.textContent = msg;
   container.appendChild(el);
   if (navigator.vibrate) navigator.vibrate(100);
-  if (type === 'ok') playToastSound();
+  if (type === 'ok') (soundFn || playToastSound)();
   _toastTimer = setTimeout(() => {
     el.classList.add('out');
     setTimeout(() => { if (el.parentNode) el.remove(); }, 230);
@@ -5676,6 +5713,7 @@ async function guardarComentario() {
 // (data.yaFirmado) y avisar en vez de mostrar un falso éxito.
 async function confirmarContrato() {
   if (!currentStandId) return;
+  primeContratoSound();
   const btn   = document.getElementById('contratoBtn');
   const msgEl = document.getElementById('ingresoMsg');
   msgEl.textContent = ''; msgEl.className = 'ingreso-msg';
@@ -5720,7 +5758,7 @@ async function confirmarContrato() {
       clearBtnBusy(btn, '✍️ Confirmar firma de contrato');
       msgEl.textContent = '';
       msgEl.className = 'ingreso-msg';
-      showToast('✅ Contrato firmado registrado');
+      showToast('✅ Contrato firmado registrado', 'ok', 2500, playContratoSound);
 
     } else if (data.yaFirmado) {
       // Concurrencia: otro Admin (o un doble clic) ya había confirmado este
