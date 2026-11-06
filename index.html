@@ -4038,6 +4038,8 @@ function showSuccessOverlay(title, subtitle, mapLoadPromise = Promise.resolve(),
       playFireworksSound();
       fireworksEffect();
       if (navigator.vibrate) navigator.vibrate([100, 150, 60, 150, 100, 150, 60, 150, 100]);
+    } else if (effect === 'ingreso') {
+      playIngresoSound();
     } else {
       playSuccessSound();
     }
@@ -4082,6 +4084,37 @@ function showSuccessOverlay(title, subtitle, mapLoadPromise = Promise.resolve(),
 
     btn.addEventListener('click', onContinue);
   });
+}
+
+// ── SONIDO DE INGRESO (llave y cerradura, generado con Web Audio) ─────────────
+// Un clic metálico, un golpe sordo, otro clic y un chime suave. Sin archivos externos.
+function _ingresoClick(ctx, start, freq) {
+  const n = Math.floor(ctx.sampleRate * 0.03);
+  const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass'; f.Q.value = 2.5;
+  f.frequency.setValueAtTime(freq, start);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, start);
+  g.gain.linearRampToValueAtTime(0.45, start + 0.009);
+  g.gain.linearRampToValueAtTime(0, start + 0.03);
+  src.connect(f).connect(g).connect(ctx.destination);
+  src.start(start);
+}
+
+function playIngresoSound() {
+  const ctx = _getSuccessAudioCtx();
+  if (!ctx) return; // navegador sin soporte de Web Audio: seguimos sin sonido
+  const t = ctx.currentTime;
+  _ingresoClick(ctx, t, 3500);
+  _successTone(ctx, 180, t + 0.07, 0.10, { type: 'sine', gain: 0.30 });
+  _ingresoClick(ctx, t + 0.12, 2000);
+  _successTone(ctx, 1175, t + 0.20, 0.80, { type: 'triangle', gain: 0.20 });
+  _successTone(ctx, 1760, t + 0.28, 0.60, { type: 'sine',     gain: 0.10 });
 }
 
 // ── SONIDO DE TOAST (confirmación corta, distinta del cha-ching de alta de stand) ──
@@ -5923,6 +5956,7 @@ async function darIngreso() {
   const msgEl = document.getElementById('ingresoMsg');
   msgEl.textContent = ''; msgEl.className = 'ingreso-msg';
 
+  try { _getSuccessAudioCtx(); } catch(e) {} // despierta el audio dentro del gesto del usuario
   setBtnBusy(btn, 'Registrando...');
   try {
     const url  = `${API_URL}?tipo=ingreso&mes=${encodeURIComponent(CURRENT_MES)}&stand=${encodeURIComponent(currentStandId)}&user=${encodeURIComponent(CURRENT_USER)}`;
@@ -5945,7 +5979,7 @@ async function darIngreso() {
       const subtitleIngreso = nombreFeriante
         ? `${nombreFeriante} - Puesto ${currentStandId}`
         : `Puesto ${currentStandId}`;
-      await showSuccessOverlay('Ingreso registrado', subtitleIngreso);
+      await showSuccessOverlay('Ingreso registrado', subtitleIngreso, Promise.resolve(), 'ingreso');
       document.getElementById('modalOverlay').classList.remove('open');
 
     } else if (data.yaIngreso) {
