@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#3a1fb4">
 <script>
@@ -27,7 +30,6 @@
 </script>
 <title>Mapa de Stands – Feria SUCOVI 2026</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1977,6 +1979,20 @@ html[data-theme="dark"] .success-chk-core {background: #30D158; box-shadow: 0 0 
   .feria-switch[aria-checked="true"] { background: #f59e0b; }
   .feria-switch[aria-checked="true"]::after { transform: translateX(18px); }
 </style>
+<style>
+/* Skeleton del mapa + relleno animado cuando llegan los datos */
+.stand.sk { background: linear-gradient(100deg,#e6e8f0 30%,#f2f3f8 50%,#e6e8f0 70%) 0 0/200% 100%; border-color: transparent; box-shadow: none; pointer-events: none; animation: skShimmer 1.4s linear infinite; }
+.stand.sk i { display: block; height: 9px; width: 60%; border-radius: 5px; background: rgba(110,118,150,.18); }
+.stand.sk i:first-child { width: 30%; height: 14px; margin-bottom: 6px; }
+html[data-theme="dark"] .stand.sk { background: linear-gradient(100deg,rgba(255,255,255,.06) 30%,rgba(255,255,255,.12) 50%,rgba(255,255,255,.06) 70%) 0 0/200% 100%; }
+html[data-theme="dark"] .stand.sk i { background: rgba(255,255,255,.12); }
+@keyframes skShimmer { to { background-position: -200% 0; } }
+@keyframes skFill { from { background: #e6e8f0; color: transparent; border-color: transparent; box-shadow: none; } }
+.grid.sk-fill .stand { animation: skFill .5s ease both; }
+/* Mientras se revalida el caché, los stands no se pueden tocar (faltan feriantes, precios, etc.) */
+body.revalidando .stand { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .stand.sk, .grid.sk-fill .stand { animation: none; } }
+</style>
 </head>
 <body>
 
@@ -2607,7 +2623,7 @@ let lastTap = 0;
 document.addEventListener('touchend', e => { const now=Date.now(); if(now-lastTap<300) e.preventDefault(); lastTap=now; }, {passive:false});
 
 // ── VERSIÓN DE LA APP ────────────────────────────────────────────────────────
-const APP_VERSION = 'v3.13';   // ← cambiá solo acá
+const APP_VERSION = 'v3.14';   // ← cambiá solo acá
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   const hv = document.getElementById('headerVersion');
@@ -2618,6 +2634,80 @@ document.addEventListener('DOMContentLoaded', () => {
 const API_URL = "https://script.google.com/macros/s/AKfycbyr1TeIqghOsVPQPxi6rrNxcEsGIEFbRtpIEtPFhQZuUZBVbKqgCJdw_vCYPxKARSi8hQ/exec";
 
 let FULL_DATA = {}, currentFloor = 'pb';
+let _animarRelleno = false; // true solo en el primer pintado real que viene después de un skeleton
+
+// ── CACHÉ LOCAL DEL MAPA (stale-while-revalidate) ───────────────────────────
+// Guarda la última foto del mapa (stands + extraData) por mes. Al abrir la app
+// se pinta al instante con eso y se refresca por atrás. NO se guardan feriantes,
+// DNI, usuarios ni precios. Se borra al cerrar sesión y vence a las 12 h.
+const SNAP_PREFIX = 'sucovi-mapa-';
+const SNAP_MAX_MS = 12 * 60 * 60 * 1000;
+function leerSnapshotMapa() {
+  try {
+    const raw = localStorage.getItem(SNAP_PREFIX + CURRENT_MES);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || s.v !== APP_VERSION || !s.d || !s.d.pbData || !s.d.paData) return null;
+    if (Date.now() - s.t > SNAP_MAX_MS) return null;
+    return s;
+  } catch(e) { return null; }
+}
+function guardarSnapshotMapa() {
+  try {
+    if (!FULL_DATA || !FULL_DATA.pbData) return;
+    const pos = o => { const r = {}; Object.keys(o || {}).forEach(k => { r[k] = { r: o[k].r, c: o[k].c }; }); return r; };
+    const lay = JSON.stringify({ pb: pos(FULL_DATA.pbData), pa: pos(FULL_DATA.paData) });
+    localStorage.setItem('sucovi-layout-' + CURRENT_MES, lay);
+    localStorage.setItem('sucovi-layout-last', lay);
+  } catch(e) {}
+}
+function limpiarSnapshotMapa() {
+  try {
+    Object.keys(localStorage).filter(k => k.indexOf(SNAP_PREFIX) === 0).forEach(k => localStorage.removeItem(k));
+  } catch(e) {}
+}
+
+// Skeleton con el plano real: usa las posiciones guardadas en la última carga
+// (del mismo mes, o de cualquier otro si es la primera vez que se abre este mes).
+// Devuelve false si todavía no hay ningún layout guardado en este dispositivo.
+function leerLayoutMapa() {
+  try {
+    const raw = localStorage.getItem('sucovi-layout-' + CURRENT_MES) || localStorage.getItem('sucovi-layout-last');
+    if (!raw) return null;
+    const l = JSON.parse(raw);
+    return (l && l.pb && l.pa && Object.keys(l.pb).length) ? l : null;
+  } catch(e) { return null; }
+}
+// Convierte el mapa que ya está en pantalla en skeleton (mismas posiciones).
+// Lo usan las acciones (asignar, pagar, mobiliario) en vez del cartel "Actualizando mapa...".
+function mostrarSkeletonMapa() {
+  try {
+    if (!FULL_DATA || !FULL_DATA.pbData) return false;
+    buildGrid('grid-pb', FULL_DATA.pbData, true);
+    buildGrid('grid-pa', FULL_DATA.paData, true);
+    return true;
+  } catch(e) { return false; }
+}
+function renderSkeletonMapa() {
+  const l = leerLayoutMapa();
+  if (!l) { // primerísima vez en este dispositivo: no se conocen las posiciones, panel neutro
+    ['grid-pb', 'grid-pa'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.style.gridTemplateColumns = 'repeat(1, 560px)';
+      el.style.gridAutoRows = '360px';
+      el.innerHTML = '<div class="stand sk" style="width:560px;height:360px;border-radius:18px"></div>';
+    });
+    document.getElementById('subtitle').textContent = 'Cargando mapa…';
+    requestAnimationFrame(() => { try { aplicarZoom(); } catch(e) {} });
+    return true;
+  }
+  buildGrid('grid-pb', l.pb, true);
+  if (Object.keys(l.pa).length) buildGrid('grid-pa', l.pa, true);
+  document.getElementById('subtitle').textContent = 'Cargando mapa…';
+  requestAnimationFrame(() => { try { aplicarZoom(); } catch(e) {} });
+  return true;
+}
 let FERIANTES_LIST = [];
 let LISTA_NEGRA = [];      // nombres normalizados (sin tildes, minúsculas, sin espacios extra)
 let VENDEDORES_LIST = [];  // solo usuarios con perfil 1, para el Admin
@@ -2668,7 +2758,17 @@ function renderMapUI() {
 }
 
 async function load(silencioso = false) {
-  if (!modalLocked && !silencioso) showLoading('Cargando mapa...');
+  // El cartel "Cargando mapa..." se mantiene, pero con el mapa en skeleton de
+  // fondo: posiciones reales guardadas de la última carga (o un panel neutro
+  // la primerísima vez en el dispositivo).
+  const primeraCarga = !FULL_DATA.pbData;
+  let veniaDeSkeleton = false;
+  const sinOverlay = silencioso;
+  if (!silencioso) {
+    if (primeraCarga) { renderSkeletonMapa(); veniaDeSkeleton = true; }
+    else if (!modalLocked) veniaDeSkeleton = mostrarSkeletonMapa();
+  }
+  if (!modalLocked && !sinOverlay) showLoading('Cargando mapa...');
   const _t0 = performance.now();
   let _tFetch = 0, _tParse = 0;
   try {
@@ -2698,10 +2798,14 @@ async function load(silencioso = false) {
     if (FULL_DATA.medios) MEDIOS_PAGO = FULL_DATA.medios;
 
     const _tRenderStart = performance.now();
+    _animarRelleno = veniaDeSkeleton || !!document.querySelector('.stand.sk');
     renderMapUI();
+    _animarRelleno = false;
+    document.body.classList.remove('revalidando');
+    guardarSnapshotMapa();
     const _tRender = performance.now() - _tRenderStart;
 
-    if (!modalLocked && !silencioso) hideLoading();
+    if (!modalLocked && !sinOverlay) hideLoading();
 
     // Solo mandamos los tiempos si el backend nos avisó que el perf log
     // está prendido — así, apagado, esto no hace ni un fetch de más.
@@ -2715,7 +2819,12 @@ async function load(silencioso = false) {
       });
     }
   } catch(e) {
-    if (!modalLocked && !silencioso) hideLoading();
+    if (!modalLocked && !sinOverlay) hideLoading();
+    if (veniaDeSkeleton || document.querySelector('.stand.sk')) {
+      let restaurado = false;
+      if (FULL_DATA && FULL_DATA.pbData) { try { renderMapUI(); restaurado = true; } catch(e2) {} }
+      if (!restaurado) document.querySelectorAll('.stand.sk').forEach(el => { el.style.animation = 'none'; });
+    }
     if (!silencioso) document.getElementById('subtitle').textContent = 'Error al cargar datos';
   }
 }
@@ -2897,8 +3006,9 @@ function resetIngresoFlip() {
   if (pollingTimer) iniciarPolling(CHEQUEO_MS);
 }
 
-function buildGrid(gridId, data) {
+function buildGrid(gridId, data, skeleton = false) {
   const el = document.getElementById(gridId);
+  el.style.gridAutoRows = ''; // por si venía de un skeleton
   const rows = Object.values(data).map(s=>s.r), cols = Object.values(data).map(s=>s.c);
   const minR=Math.min(...rows), maxR=Math.max(...rows), minC=Math.min(...cols), maxC=Math.max(...cols);
   el.style.gridTemplateColumns = `repeat(${maxC-minC+1}, 68px)`;
@@ -2908,7 +3018,9 @@ function buildGrid(gridId, data) {
   for (let r=minR; r<=maxR; r++) {
     for (let c=minC; c<=maxC; c++) {
       const s = idx[`${r},${c}`];
-      if (s) {
+      if (s && skeleton) {
+        html += '<div class="stand sk"><i></i><i></i></div>';
+      } else if (s) {
         const extra  = (FULL_DATA.extraData||{})[s.num] || {};
         const nombre = extra.n || '';
         const precio = extra.pr;
@@ -2940,6 +3052,8 @@ function buildGrid(gridId, data) {
     }
   }
   el.innerHTML = html;
+  el.classList.toggle('sk-fill', _animarRelleno);
+  if (_animarRelleno) setTimeout(() => el.classList.remove('sk-fill'), 800);
 }
 
 function buildStats() {
@@ -3954,6 +4068,8 @@ function showSuccessOverlay(title, subtitle, mapLoadPromise = Promise.resolve(),
         resolve();
         return;
       }
+      document.getElementById('modalOverlay').classList.remove('open'); // el formulario ya se cargó: no hace falta seguir mostrándolo
+      mostrarSkeletonMapa(); // skeleton de fondo, detrás del cartel
       showLoading('Actualizando mapa...');
       mapLoadPromise.then(() => {
         hideLoading();
@@ -3980,41 +4096,23 @@ function playToastSound() {
   _successTone(ctx, 1175, t + 0.42, 0.35, { type: 'sine',     gain: 0.06 }); // cola/eco suave
 }
 
-// ── SONIDO DE FIRMA DE CONTRATO (mp3 del repo de GitHub) ─────────────────────
-// Reemplaza al sonido sintetizado SOLO cuando se confirma una firma de contrato.
-// Si el mp3 no carga o el navegador bloquea la reproducción, cae al sonido de siempre.
-const CONTRATO_SOUND_URL = 'https://raw.githubusercontent.com/agazzane/Mapa-Feria-SUCOVI/main/Pefeto%20Cabashedo.MP3';
-let _contratoAudio = null;
-
-function _getContratoAudio() {
-  if (!_contratoAudio) {
-    _contratoAudio = new Audio(CONTRATO_SOUND_URL);
-    _contratoAudio.preload = 'auto';
-  }
-  return _contratoAudio;
-}
-
-// Se llama apenas se toca el botón (dentro del gesto del usuario): en iOS/Safari
-// el audio solo se "desbloquea" así, y después el play() posterior a la respuesta
-// del servidor ya no es rechazado. Va en silencio (muted) y se frena enseguida.
+// ── SONIDO DE FIRMA DE CONTRATO (fanfarria corta, generada con Web Audio) ─────
+// Tres notas que suben y una larga al final. Sin archivos externos.
+// primeContratoSound() se llama dentro del gesto del usuario (al tocar el botón)
+// para que el navegador deje reproducir el audio después de la respuesta del servidor.
 function primeContratoSound() {
-  try {
-    const a = _getContratoAudio();
-    a.muted = true;
-    const p = a.play();
-    const done = () => { a.pause(); a.currentTime = 0; a.muted = false; };
-    if (p && p.then) p.then(done, () => { a.muted = false; }); else done();
-  } catch (e) {}
+  try { _getSuccessAudioCtx(); } catch (e) {}
 }
 
 function playContratoSound() {
-  try {
-    const a = _getContratoAudio();
-    a.muted = false;
-    a.currentTime = 0;
-    const p = a.play();
-    if (p && p.catch) p.catch(() => playToastSound());
-  } catch (e) { playToastSound(); }
+  const ctx = _getSuccessAudioCtx();
+  if (!ctx) return; // navegador sin soporte de Web Audio: seguimos sin sonido
+  const t = ctx.currentTime;
+  _successTone(ctx, 784,  t,        0.10, { type: 'triangle', gain: 0.22 });
+  _successTone(ctx, 988,  t + 0.09, 0.10, { type: 'triangle', gain: 0.22 });
+  _successTone(ctx, 1175, t + 0.18, 0.10, { type: 'triangle', gain: 0.22 });
+  _successTone(ctx, 1568, t + 0.27, 0.70, { type: 'triangle', gain: 0.22 }); // nota larga final
+  _successTone(ctx, 2349, t + 0.27, 0.50, { type: 'sine',     gain: 0.05 }); // armónico
 }
 
 // ── TOAST ────────────────────────────────────────────────────────────────────
@@ -4055,6 +4153,10 @@ function clearBtnBusy(btn, text) {
 
 function lockModal(text = 'Actualizando mapa...') {
   modalLocked = true;
+  if (text === 'Actualizando mapa...') {
+    document.getElementById('modalOverlay').classList.remove('open'); // la acción ya se guardó: se cierra la ficha
+    mostrarSkeletonMapa(); // skeleton de fondo, detrás del cartel
+  }
   showLoading(text);
 }
 
@@ -4771,6 +4873,7 @@ function cerrarSesion() {
   sessionStorage.removeItem('feriaPerfil');
   sessionStorage.removeItem('feriaMes');
   sessionStorage.removeItem('feriaMesLabel');
+  limpiarSnapshotMapa();
   location.reload();
 }
 
