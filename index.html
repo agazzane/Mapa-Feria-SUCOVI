@@ -5642,6 +5642,7 @@ let almuerzoCargaId = 0;        // descarta respuestas viejas si se cambió de s
 let almuerzoEnvioEnCurso = false;
 let almuerzoCargado = false;    // true cuando ya se consultó al servidor para el stand abierto
 let almuerzoCargando = false;
+let almuerzoVentaSeq = 0;       // sube con cada venta: descarta una consulta que arrancó antes de la venta
 
 function almEsc(t) {
   return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -5669,9 +5670,23 @@ function renderAlmuerzoSection(estado) {
   document.getElementById('almMsg').className = 'mob-adicional-msg';
   document.getElementById('almObs').value = '';
   pintarAlmuerzoDetalle();
-  // v3.16: se consulta ya, en segundo plano, para que "ya compró X de 2" se vea
-  // en la cabecera aunque el acordeón siga cerrado.
-  cargarAlmuerzoInfo();
+  // Precarga: el mapa ya trae productos + ventas de todos los stands (FULL_DATA.almuerzo),
+  // así que "ya compró X de 2" y el detalle se pintan al instante, sin esperar a Apps Script.
+  const pre = FULL_DATA && FULL_DATA.almuerzo;
+  if (pre && Array.isArray(pre.productos)) {
+    almuerzoProductos = pre.productos;
+    almuerzoVentas    = ((pre.ventas || {})[currentStandId] || []).slice();
+    almuerzoVendidas  = almuerzoVentas.reduce((a, v) => a + (Number(v.c) || 0), 0);
+    almuerzoMax       = Number(pre.max) || 2;
+    almuerzoCargado   = true;
+    pintarAlmuerzoForm();
+    // Revalida en silencio por si otro vendedor vendió después de la última carga del mapa
+    // (las ventas de almuerzo no mueven el timestamp, así que el polling no las detecta).
+    cargarAlmuerzoInfo(true);
+  } else {
+    // Sin datos precargados (backend viejo o falló): como siempre, consulta ya en segundo plano.
+    cargarAlmuerzoInfo();
+  }
 }
 
 function toggleAlmuerzoAcc() {
@@ -5682,30 +5697,60 @@ function toggleAlmuerzoAcc() {
   if (abrir && !almuerzoCargado && !almuerzoCargando) cargarAlmuerzoInfo(); // ya se consultó al abrir el stand; si falló, reintenta
 }
 
-async function cargarAlmuerzoInfo() {
+async function cargarAlmuerzoInfo(silencioso = false) {
   const standId = currentStandId;
   if (!standId) return;
   const miCarga = ++almuerzoCargaId;
-  almuerzoCargando = true;
+  const seq = almuerzoVentaSeq;
   const est  = document.getElementById('almuerzoEstado');
   const form = document.getElementById('almuerzoForm');
-  form.style.display = 'none';
-  est.className = 'mob-adicional-msg';
-  est.textContent = 'Consultando…';
+  if (!silencioso) {
+    almuerzoCargando = true;
+    form.style.display = 'none';
+    est.className = 'mob-adicional-msg';
+    est.textContent = 'Consultando…';
+  }
   try {
     const url = `${API_URL}?tipo=almuerzoinfo&mes=${encodeURIComponent(CURRENT_MES)}&stand=${encodeURIComponent(standId)}&_=${Date.now()}`;
     const [res] = await Promise.all([fetch(url, { cache: 'no-store' }), cargarMediosPago()]);
     const data = await res.json();
     if (miCarga !== almuerzoCargaId || standId !== currentStandId) return; // se cambió de stand mientras tanto
+    if (seq !== almuerzoVentaSeq) return;                                  // se vendió algo mientras consultaba: esta respuesta ya quedó vieja
     if (!data.ok) throw new Error(data.error || 'No se pudo consultar los almuerzos.');
-    almuerzoProductos = data.productos || [];
-    almuerzoVendidas  = Number(data.vendidas) || 0;
-    almuerzoVentas    = data.ventas || [];
-    almuerzoMax       = Number(data.max) || 2;
+
+    const nuevo = {
+      productos: data.productos || [],
+      vendidas:  Number(data.vendidas) || 0,
+      ventas:    data.ventas || [],
+      max:       Number(data.max) || 2
+    };
+
+    if (silencioso) {
+      // Solo se vuelve a pintar si cambió algo (así no se pisa lo que el vendedor esté eligiendo).
+      const igual = JSON.stringify(nuevo) === JSON.stringify({
+        productos: almuerzoProductos, vendidas: almuerzoVendidas, ventas: almuerzoVentas, max: almuerzoMax
+      });
+      almuerzoProductos = nuevo.productos; almuerzoVendidas = nuevo.vendidas;
+      almuerzoVentas = nuevo.ventas;       almuerzoMax = nuevo.max;
+      almuerzoCargado = true;
+      // Deja el mapa en memoria al día para cuando se reabra este stand.
+      if (FULL_DATA && FULL_DATA.almuerzo) {
+        if (!FULL_DATA.almuerzo.ventas) FULL_DATA.almuerzo.ventas = {};
+        FULL_DATA.almuerzo.ventas[standId] = nuevo.ventas.slice();
+      }
+      if (!igual && !almuerzoEnvioEnCurso) pintarAlmuerzoForm();
+      return;
+    }
+
+    almuerzoProductos = nuevo.productos;
+    almuerzoVendidas  = nuevo.vendidas;
+    almuerzoVentas    = nuevo.ventas;
+    almuerzoMax       = nuevo.max;
     almuerzoCargado   = true;
     almuerzoCargando  = false;
     pintarAlmuerzoForm();
   } catch (err) {
+    if (silencioso) return; // falló la revalidación: se queda con lo precargado del mapa
     if (miCarga !== almuerzoCargaId) return;
     almuerzoCargando = false;
     document.getElementById('almuerzoResumen').textContent = '';
@@ -5827,6 +5872,12 @@ async function venderAlmuerzo() {
     clearBtnBusy(btn, 'Registrar venta de almuerzo');
     if (data.ok) {
       showToast(`✅ Almuerzo registrado · ${cant}× ${prod.n}`);
+      almuerzoVentaSeq++;
+      // Mapa en memoria al día: si se reabre el stand, el detalle ya incluye esta venta.
+      if (data.venta && FULL_DATA && FULL_DATA.almuerzo) {
+        if (!FULL_DATA.almuerzo.ventas) FULL_DATA.almuerzo.ventas = {};
+        (FULL_DATA.almuerzo.ventas[standId] = FULL_DATA.almuerzo.ventas[standId] || []).push(data.venta);
+      }
       if (standId === currentStandId) {
         almuerzoVendidas = Number(data.vendidas) || (almuerzoVendidas + cant);
         if (data.venta) almuerzoVentas.push(data.venta);
