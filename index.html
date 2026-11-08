@@ -5914,9 +5914,12 @@ function renderAlmuerzoPanel(preservar = true) {
 
   list.innerHTML = almuerzoProductos.map((p, i) => {
     const precio = '$' + Number(p.p).toLocaleString('es-AR');
+    // Unidades de este producto que el stand ya compró (mismo estilo que "Ya alquilado" en mobiliario)
+    const yaCompro = almuerzoVentas.reduce((a, v) => a + (v.p === p.n ? (Number(v.c) || 0) : 0), 0);
+    const lockedStr = yaCompro > 0 ? `<span class="mob-item-locked">🔒 Ya compró ×${yaCompro}</span>` : '';
     return `
     <div class="mob-item">
-      <div class="mob-item-name">${almEsc(p.n)} <span style="font-size:12px;color:#64748b;font-weight:500">${precio}</span></div>
+      <div class="mob-item-name">${almEsc(p.n)} <span style="font-size:12px;color:#64748b;font-weight:500">${precio}</span>${lockedStr}</div>
       <div class="mob-counter">
         <button class="mob-btn minus" onclick="changeAlmuerzoQty(${i},-1)">−</button>
         <span class="mob-qty" id="almqty_${i}">${almSel[i] || 0}</span>
