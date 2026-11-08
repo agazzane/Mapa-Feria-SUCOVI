@@ -2588,14 +2588,14 @@ body.revalidando .stand { pointer-events: none; }
       <div id="almuerzoForm" style="display:none;margin-top:14px">
         <div class="mob-adicional-row">
           <div class="mob-adicional-group">
+            <label class="mob-adicional-label">Monto ($) — pago 100%</label>
+            <input type="text" class="mob-adicional-input" id="almMonto" readonly placeholder="—" style="font-weight:700;cursor:default">
+          </div>
+          <div class="mob-adicional-group">
             <label class="mob-adicional-label">Medio de pago</label>
             <div class="mob-adicional-select-wrap">
               <select class="mob-adicional-select" id="almMedio" onchange="checkAlmuerzoBtn()"></select>
             </div>
-          </div>
-          <div class="mob-adicional-group">
-            <label class="mob-adicional-label">Monto ($) — pago 100%</label>
-            <input type="text" class="mob-adicional-input" id="almMonto" readonly placeholder="—" style="font-weight:700;cursor:default">
           </div>
         </div>
         <!-- Solo Admin (perfil 3): en nombre de qué vendedor se registra -->
@@ -5668,7 +5668,15 @@ let almuerzoEnvioEnCurso = false;
 let almuerzoCargado = false;    // true cuando ya se tienen los datos del stand abierto
 let almuerzoCargando = false;
 let almuerzoVentaSeq = 0;       // sube con cada venta: descarta una consulta que arrancó antes de la venta
-let almSel = { idx: -1, qty: 0 }; // selección del panel: UN producto + cantidad
+let almSel = {};   // selección del panel: { índiceProducto: cantidad } (puede haber varios productos)
+
+function almTotalSel() { return Object.values(almSel).reduce((a, q) => a + q, 0); }
+// [{ prod, c }] de lo seleccionado, en el orden de la lista
+function almSelItems() {
+  return Object.keys(almSel).map(Number).sort((a, b) => a - b)
+    .filter(i => almuerzoProductos[i] && almSel[i] > 0)
+    .map(i => ({ prod: almuerzoProductos[i], c: almSel[i] }));
+}
 
 function almEsc(t) {
   return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -5716,7 +5724,7 @@ function renderAlmuerzoSection(estado) {
   almuerzoVentas = [];
   almuerzoCargado = false;
   almuerzoCargando = false;
-  almSel = { idx: -1, qty: 0 };
+  almSel = {};
   setAcc('almuerzoHeader', 'almuerzoBody', false);
   document.getElementById('almuerzoResumen').textContent = '…';
   const est = document.getElementById('almuerzoEstado');
@@ -5817,11 +5825,9 @@ async function cargarAlmuerzoInfo(silencioso = false) {
 }
 
 // Detalle de lo comprado por el stand (dentro del acordeón)
-function pintarAlmuerzoDetalle() {
-  const el = document.getElementById('almuerzoDetalle');
-  if (!el) return;
-  if (!almuerzoVentas.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
-  el.innerHTML = '<div class="mob-adicional-label" style="margin-bottom:4px">Almuerzos vendidos a este stand</div>'
+function almuerzoDetalleHTML(titulo) {
+  if (!almuerzoVentas.length) return '';
+  return `<div class="mob-adicional-label" style="margin:12px 0 4px">${almEsc(titulo)}</div>`
     + almuerzoVentas.map(v => {
         const sub = [v.v, v.mp, v.f].filter(Boolean).join(' · ');
         return `<div class="alm-venta">`
@@ -5830,6 +5836,13 @@ function pintarAlmuerzoDetalle() {
           + `<div class="alm-venta-sub">${almEsc(sub)}${v.o ? '<br>' + almEsc(v.o) : ''}</div>`
           + `</div>`;
       }).join('');
+}
+
+function pintarAlmuerzoDetalle() {
+  const el = document.getElementById('almuerzoDetalle');
+  if (!el) return;
+  if (!almuerzoVentas.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.innerHTML = almuerzoDetalleHTML('Almuerzos vendidos a este stand');
   el.style.display = 'block';
 }
 
@@ -5854,7 +5867,7 @@ function pintarAlmuerzoForm() {
 
 function openAlmuerzoPanel() {
   if (!almuerzoCargado && !almuerzoCargando) cargarAlmuerzoInfo(); // por si falló la precarga
-  almSel = { idx: -1, qty: 0 };
+  almSel = {};
   document.getElementById('almObs').value = '';
   const m = document.getElementById('almMsg');
   m.textContent = ''; m.className = 'mob-adicional-msg';
@@ -5884,11 +5897,20 @@ function renderAlmuerzoPanel(preservar = true) {
   };
   if (!almuerzoCargado) { soloNota('Consultando…'); return; }
   if (!almuerzoProductos.length) { soloNota('No hay almuerzos cargados en la hoja PRECIOS.'); return; }
-  if (restan <= 0) { soloNota(`Este stand ya alcanzó el máximo de ${almuerzoMax} almuerzos.`); return; }
+  if (restan <= 0) {
+    soloNota(`Este stand ya alcanzó el máximo de ${almuerzoMax} almuerzos.`);
+    // Debajo del aviso, el detalle de lo que ya compró
+    list.innerHTML = almuerzoDetalleHTML('Lo que ya compró este stand');
+    return;
+  }
 
   nota.style.display = 'none';
-  if (almSel.qty > restan) almSel.qty = restan;
-  if (almSel.qty <= 0) almSel = { idx: -1, qty: 0 };
+  // Si lo que le queda bajó (ej. otro vendedor vendió mientras tanto), se recorta la selección
+  let exceso = almTotalSel() - restan;
+  Object.keys(almSel).map(Number).sort((a, b) => b - a).forEach(k => {
+    if (exceso > 0) { const q = Math.min(almSel[k], exceso); almSel[k] -= q; exceso -= q; }
+    if (almSel[k] <= 0) delete almSel[k];
+  });
 
   list.innerHTML = almuerzoProductos.map((p, i) => {
     const precio = '$' + Number(p.p).toLocaleString('es-AR');
@@ -5897,7 +5919,7 @@ function renderAlmuerzoPanel(preservar = true) {
       <div class="mob-item-name">${almEsc(p.n)} <span style="font-size:12px;color:#64748b;font-weight:500">${precio}</span></div>
       <div class="mob-counter">
         <button class="mob-btn minus" onclick="changeAlmuerzoQty(${i},-1)">−</button>
-        <span class="mob-qty" id="almqty_${i}">${almSel.idx === i ? almSel.qty : 0}</span>
+        <span class="mob-qty" id="almqty_${i}">${almSel[i] || 0}</span>
         <button class="mob-btn" onclick="changeAlmuerzoQty(${i},1)">+</button>
       </div>
     </div>`;
@@ -5923,35 +5945,37 @@ function renderAlmuerzoPanel(preservar = true) {
   actualizarAlmuerzoMonto();
 }
 
-// − / +: UN solo producto por venta (elegir otro reemplaza al anterior). Tope = lo que le queda al stand.
+// − / +: se puede elegir de varios productos (ej. 1 de cada uno). Tope = lo que le queda al stand en total.
 function changeAlmuerzoQty(i, delta) {
   const restan = almRestan();
+  const actual = almSel[i] || 0;
   if (delta > 0) {
-    if (almSel.idx !== i) almSel = { idx: i, qty: 0 };
-    almSel.qty = Math.min(restan, almSel.qty + 1);
-  } else if (almSel.idx === i) {
-    almSel.qty = Math.max(0, almSel.qty - 1);
-    if (almSel.qty === 0) almSel = { idx: -1, qty: 0 };
+    if (almTotalSel() >= restan) {
+      showToast(`Este stand puede comprar ${restan} almuerzo${restan === 1 ? '' : 's'} más en total`);
+      return;
+    }
+    almSel[i] = actual + 1;
+  } else if (actual > 0) {
+    if (actual - 1 <= 0) delete almSel[i]; else almSel[i] = actual - 1;
   }
   almuerzoProductos.forEach((_, k) => {
     const el = document.getElementById('almqty_' + k);
-    if (el) el.textContent = (almSel.idx === k ? almSel.qty : 0);
+    if (el) el.textContent = almSel[k] || 0;
   });
   actualizarAlmuerzoMonto();
 }
 
 function actualizarAlmuerzoMonto() {
-  const prod = almuerzoProductos[almSel.idx];
-  const cant = almSel.qty;
-  document.getElementById('almMonto').value = (prod && cant) ? '$ ' + (prod.p * cant).toLocaleString('es-AR') : '';
+  const total = almSelItems().reduce((a, it) => a + it.prod.p * it.c, 0);
+  document.getElementById('almMonto').value = total ? '$ ' + total.toLocaleString('es-AR') : '';
   checkAlmuerzoBtn();
 }
 
 function checkAlmuerzoBtn() {
   const btn = document.getElementById('almBtn');
   if (!btn || almuerzoEnvioEnCurso) return;
-  const prodOk = !!almuerzoProductos[almSel.idx];
-  const cantOk = almSel.qty >= 1;
+  const prodOk = almSelItems().length >= 1;
+  const cantOk = almTotalSel() >= 1;
   const medioOk = !!document.getElementById('almMedio').value.trim();
   const vendOk = CURRENT_PERFIL !== 3 || !!document.getElementById('almVendedor').value.trim();
   btn.disabled = !(prodOk && cantOk && medioOk && vendOk);
@@ -5961,16 +5985,15 @@ async function venderAlmuerzo() {
   if (almuerzoEnvioEnCurso || !currentStandId) return;
   const btn   = document.getElementById('almBtn');
   const msgEl = document.getElementById('almMsg');
-  const prod  = almuerzoProductos[almSel.idx];
-  const cant  = almSel.qty;
+  const items = almSelItems();
+  const cant  = items.reduce((a, it) => a + it.c, 0);
   const medio = document.getElementById('almMedio').value.trim();
   const vendedor = CURRENT_PERFIL === 3 ? document.getElementById('almVendedor').value.trim() : '';
   const obs   = document.getElementById('almObs').value.trim();
 
   msgEl.textContent = '';
   msgEl.className = 'mob-adicional-msg';
-  if (!prod)  { msgEl.textContent = 'Elegí un almuerzo.'; msgEl.className = 'mob-adicional-msg err'; return; }
-  if (!cant)  { msgEl.textContent = 'Elegí la cantidad.'; msgEl.className = 'mob-adicional-msg err'; return; }
+  if (!items.length || !cant) { msgEl.textContent = 'Elegí al menos un almuerzo.'; msgEl.className = 'mob-adicional-msg err'; return; }
   if (!medio) { msgEl.textContent = 'Seleccioná un medio de pago.'; msgEl.className = 'mob-adicional-msg err'; return; }
   if (CURRENT_PERFIL === 3 && !vendedor) { msgEl.textContent = 'Elegí el vendedor.'; msgEl.className = 'mob-adicional-msg err'; return; }
 
@@ -5981,7 +6004,7 @@ async function venderAlmuerzo() {
   let refrescar = false;
   try {
     const url = `${API_URL}?tipo=almuerzo&mes=${encodeURIComponent(CURRENT_MES)}&stand=${encodeURIComponent(standId)}`
-      + `&user=${encodeURIComponent(CURRENT_USER)}&producto=${encodeURIComponent(prod.n)}&cant=${cant}`
+      + `&user=${encodeURIComponent(CURRENT_USER)}&items=${encodeURIComponent(JSON.stringify(items.map(it => ({ p: it.prod.n, c: it.c }))))}`
       + `&medio=${encodeURIComponent(medio)}`
       + (vendedor ? `&vendedor=${encodeURIComponent(vendedor)}` : '')
       + `&obs=${encodeURIComponent(obs)}`;
@@ -5989,18 +6012,20 @@ async function venderAlmuerzo() {
     const data = await res.json();
     clearBtnBusy(btn, 'Registrar venta de almuerzo');
     if (data.ok) {
-      showToast(`✅ Almuerzo registrado · ${cant}× ${prod.n}`);
+      showToast(`✅ Almuerzo registrado · ${items.map(it => `${it.c}× ${it.prod.n}`).join(' + ')}`);
       almuerzoVentaSeq++;
       // Mapa en memoria al día: si se reabre el stand, el detalle ya incluye esta venta.
-      if (data.venta && FULL_DATA && FULL_DATA.almuerzo) {
+      const nuevas = Array.isArray(data.ventas) ? data.ventas : (data.venta ? [data.venta] : []);
+      if (nuevas.length && FULL_DATA && FULL_DATA.almuerzo) {
         if (!FULL_DATA.almuerzo.ventas) FULL_DATA.almuerzo.ventas = {};
-        (FULL_DATA.almuerzo.ventas[standId] = FULL_DATA.almuerzo.ventas[standId] || []).push(data.venta);
+        const arr = (FULL_DATA.almuerzo.ventas[standId] = FULL_DATA.almuerzo.ventas[standId] || []);
+        nuevas.forEach(v => arr.push(v));
       }
       refrescarAvisoAlmuerzo(standId);   // 🍔 en la ficha y en el mapa
       if (standId === currentStandId) {
         almuerzoVendidas = Number(data.vendidas) || (almuerzoVendidas + cant);
-        if (data.venta) almuerzoVentas.push(data.venta);
-        almSel = { idx: -1, qty: 0 };
+        nuevas.forEach(v => almuerzoVentas.push(v));
+        almSel = {};
         closeAlmuerzoPanel();
         pintarAlmuerzoForm();
         setAcc('almuerzoHeader', 'almuerzoBody', true); // se abre el detalle para ver lo recién cargado
