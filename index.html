@@ -2623,7 +2623,7 @@ let lastTap = 0;
 document.addEventListener('touchend', e => { const now=Date.now(); if(now-lastTap<300) e.preventDefault(); lastTap=now; }, {passive:false});
 
 // ── VERSIÓN DE LA APP ────────────────────────────────────────────────────────
-const APP_VERSION = 'v3.14';   // ← cambiá solo acá
+const APP_VERSION = 'v3.15';   // ← cambiá solo acá
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   const hv = document.getElementById('headerVersion');
@@ -2873,15 +2873,16 @@ function enviarPerfFrontend(tipo, tiempos) {
 // mapa completo con load(true) — silencioso, sin tapar la pantalla con el
 // spinner. Así todos los que tienen la página abierta ven los cambios de
 // otros sin tener que refrescar manualmente.
-const CHEQUEO_MS = 60000; // 1 minuto (antes 5s — se espació para no competir con acciones reales)
+const CHEQUEO_MS = 300000; // 5 minutos (cartel al frente)
 // Mientras la tarjeta de ocupación está volteada mostrando el % de ingreso,
 // aceleramos el mismo chequeo liviano (ver toggleIngresoFlip). No hace
 // falta un endpoint nuevo: es el mismo tipo=timestamp de siempre, solo que
 // preguntado más seguido durante la ventana en la que a alguien le importa
 // ver el ingreso casi en vivo. Vuelve solo a CHEQUEO_MS al voltear de nuevo.
-const CHEQUEO_RAPIDO_MS = 15000;
+const CHEQUEO_RAPIDO_MS = 10000;
 let ultimoTimestampConocido = null;
 let pollingTimer = null;
+let chequeoForzadoPendiente = false; // v3.15: si se pide un chequeo forzado (voltear cartel) mientras hay otro en vuelo, se reintenta al terminar
 let pollEnCurso = false; // evita que se apilen chequeos si el anterior (o el load(true) que dispara) todavía no terminó
 
 // ── Estado de la animación del dorso de ingreso (ver buildStats / toggleIngresoFlip) ──
@@ -2889,20 +2890,31 @@ let lastIngresoStats = { pct: 0, ok: 0, pend: 0, total: 0 }; // último dato rea
 let ingresoStatsConocidos = false; // false hasta el primer buildStats() con datos
 let ingresoAnimEnCurso = false;    // true mientras corre el conteo 0→real al voltear
 
-async function chequearActualizaciones() {
+async function chequearActualizaciones(forzar = false) {
   // No competir por red/Apps Script con una acción en curso (venta, pago,
   // mobiliario, contrato, ingreso, etc.): esas ya van a disparar su propio
   // load() al terminar, así que el polling puede esperar al próximo ciclo.
   if (modalLocked) return;
-  if (pollEnCurso) return;
+  if (pollEnCurso) {
+    // v3.15: un chequeo forzado (voltear el cartel) ya no se descarta en
+    // silencio si justo hay otro en vuelo: se reintenta apenas termine.
+    if (forzar) chequeoForzadoPendiente = true;
+    return;
+  }
   pollEnCurso = true;
   try {
-    const res  = await fetch(`${API_URL}?tipo=timestamp&mes=${encodeURIComponent(CURRENT_MES)}`);
+    // v3.15: cache-busting + no-store para que el navegador nunca sirva un
+    // timestamp viejo.
+    const res  = await fetch(`${API_URL}?tipo=timestamp&mes=${encodeURIComponent(CURRENT_MES)}&_=${Date.now()}`, { cache: 'no-store' });
     const data = await res.json();
     if (ultimoTimestampConocido === null) {
-      // Primera lectura: solo guardamos el valor, no hace falta recargar
-      // porque load() ya trajo el mapa actualizado en el login.
+      // Primera lectura: guardamos el valor base. Normalmente no hace falta
+      // recargar porque load() ya trajo el mapa en el login, pero si el
+      // chequeo es forzado (voltear el cartel) recargamos igual: cualquier
+      // cambio ocurrido entre el load() y esta primera lectura quedaría
+      // como "ya visto" y nunca se reflejaría.
       ultimoTimestampConocido = data.ts;
+      if (forzar && !modalLocked) await load(true);
       return;
     }
     if (data.ts !== ultimoTimestampConocido) {
@@ -2918,12 +2930,16 @@ async function chequearActualizaciones() {
     // solo en el próximo ciclo, sin molestar al usuario.
   } finally {
     pollEnCurso = false;
+    if (chequeoForzadoPendiente) {
+      chequeoForzadoPendiente = false;
+      chequearActualizaciones(true);
+    }
   }
 }
 
 function iniciarPolling(intervaloMs = CHEQUEO_MS) {
   if (pollingTimer) clearInterval(pollingTimer);
-  pollingTimer = setInterval(chequearActualizaciones, intervaloMs);
+  pollingTimer = setInterval(() => chequearActualizaciones(), intervaloMs);
 }
 
 // ── FLIP de la tarjeta de ocupación (frente = stands, dorso = % ingreso) ──
@@ -2939,7 +2955,7 @@ function toggleIngresoFlip() {
   // chequeamos ya mismo si hay algo nuevo, así arranca con el dato fresco.
   if (flipped) {
     animateIngresoCountUp();
-    chequearActualizaciones();
+    chequearActualizaciones(true);
   }
 }
 
@@ -2956,20 +2972,25 @@ function animateIngresoCountUp() {
   const segPend  = document.getElementById('occSegIngresoPend');
   if (!elPctIng || !elOk || !elPend || !segOk || !segPend) return;
 
-  const destino = lastIngresoStats;
-  const total = destino.total || 0;
+  const total0 = lastIngresoStats.total || 0;
 
   ingresoAnimEnCurso = true;
   elPctIng.textContent = '0%';
   elOk.textContent = '0';
-  elPend.textContent = total;
+  elPend.textContent = total0;
   segOk.style.width   = '0%';
-  segPend.style.width = total > 0 ? '100%' : '0%';
+  segPend.style.width = total0 > 0 ? '100%' : '0%';
 
   const duracionMs = 1700; // antes 650ms: muy rápido, no se alcanzaba a notar que arrancaba en 0
   const pausaInicialMs = 300; // pequeña pausa mostrando "0" antes de empezar a contar
   const inicio = performance.now() + pausaInicialMs;
   function step(ahora) {
+    // v3.15: se lee lastIngresoStats EN CADA FRAME (no una copia tomada al
+    // arrancar). buildStats() reemplaza ese objeto cuando llega un dato nuevo
+    // durante el conteo; con la copia vieja la animación terminaba mostrando
+    // el valor desactualizado y nadie lo corregía después.
+    const destino = lastIngresoStats;
+    const total = destino.total || 0;
     const t = Math.max(0, Math.min(1, (ahora - inicio) / duracionMs));
     const eased = 1 - Math.pow(1 - t, 3); // ease-out cúbico, igual que en la demo
     const pctActual = Math.round(destino.pct * eased);
