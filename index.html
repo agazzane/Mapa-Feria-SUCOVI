@@ -1666,6 +1666,9 @@ html[data-theme="dark"] .filtros-sheet .search-filters-row { background: transpa
   border-color: var(--ind); box-shadow: 0 0 0 3px rgba(58,31,180,.12);
 }
 #mobAdicionalMonto, #almMonto { background: var(--ind-soft) !important; color: var(--ind) !important; }
+.alm-venta { padding: 8px 0; border-top: 1px solid rgba(128,128,128,.25); font-size: 13px; }
+.alm-venta-top { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; color: var(--text); }
+.alm-venta-sub { font-size: 11px; color: var(--text3); margin-top: 2px; word-break: break-word; }
 .select-wrap::after, .alta-select-wrap::after, .pago-select-wrap::after,
 .assign-pago-select-wrap::after, .mob-adicional-select-wrap::after { color: var(--ind); }
 
@@ -2507,6 +2510,7 @@ body.revalidando .stand { pointer-events: none; }
       </div>
       <div class="acc-body" id="almuerzoBody">
         <div class="mob-adicional-msg" id="almuerzoEstado" style="margin:0 0 10px"></div>
+        <div id="almuerzoDetalle" style="display:none;margin:0 0 12px"></div>
         <div id="almuerzoForm" style="display:none">
           <div class="mob-adicional-row">
             <div class="mob-adicional-group">
@@ -5632,9 +5636,12 @@ async function agregarMobSenado() {
 const ALMUERZO_ESTADOS = ['Señado', 'Pagado', 'Excedido'];
 let almuerzoProductos = [];     // [{ n: descripción, p: precio }] desde PRECIOS
 let almuerzoVendidas = 0;       // unidades ya compradas por el stand abierto
+let almuerzoVentas = [];        // detalle de lo vendido al stand abierto
 let almuerzoMax = 2;
 let almuerzoCargaId = 0;        // descarta respuestas viejas si se cambió de stand
 let almuerzoEnvioEnCurso = false;
+let almuerzoCargado = false;    // true cuando ya se consultó al servidor para el stand abierto
+let almuerzoCargando = false;
 
 function almEsc(t) {
   return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -5649,8 +5656,11 @@ function renderAlmuerzoSection(estado) {
   almuerzoCargaId++;
   almuerzoProductos = [];
   almuerzoVendidas = 0;
+  almuerzoVentas = [];
+  almuerzoCargado = false;
+  almuerzoCargando = false;
   setAcc('almuerzoHeader', 'almuerzoBody', false);
-  document.getElementById('almuerzoResumen').textContent = '';
+  document.getElementById('almuerzoResumen').textContent = '…';
   const est = document.getElementById('almuerzoEstado');
   est.textContent = '';
   est.className = 'mob-adicional-msg';
@@ -5658,6 +5668,10 @@ function renderAlmuerzoSection(estado) {
   document.getElementById('almMsg').textContent = '';
   document.getElementById('almMsg').className = 'mob-adicional-msg';
   document.getElementById('almObs').value = '';
+  pintarAlmuerzoDetalle();
+  // v3.16: se consulta ya, en segundo plano, para que "ya compró X de 2" se vea
+  // en la cabecera aunque el acordeón siga cerrado.
+  cargarAlmuerzoInfo();
 }
 
 function toggleAlmuerzoAcc() {
@@ -5665,13 +5679,14 @@ function toggleAlmuerzoAcc() {
   if (!body) return;
   const abrir = !body.classList.contains('open');
   setAcc('almuerzoHeader', 'almuerzoBody', abrir);
-  if (abrir) cargarAlmuerzoInfo();   // al abrir: productos/precios y unidades ya vendidas, siempre frescos
+  if (abrir && !almuerzoCargado && !almuerzoCargando) cargarAlmuerzoInfo(); // ya se consultó al abrir el stand; si falló, reintenta
 }
 
 async function cargarAlmuerzoInfo() {
   const standId = currentStandId;
   if (!standId) return;
   const miCarga = ++almuerzoCargaId;
+  almuerzoCargando = true;
   const est  = document.getElementById('almuerzoEstado');
   const form = document.getElementById('almuerzoForm');
   form.style.display = 'none';
@@ -5685,10 +5700,15 @@ async function cargarAlmuerzoInfo() {
     if (!data.ok) throw new Error(data.error || 'No se pudo consultar los almuerzos.');
     almuerzoProductos = data.productos || [];
     almuerzoVendidas  = Number(data.vendidas) || 0;
+    almuerzoVentas    = data.ventas || [];
     almuerzoMax       = Number(data.max) || 2;
+    almuerzoCargado   = true;
+    almuerzoCargando  = false;
     pintarAlmuerzoForm();
   } catch (err) {
     if (miCarga !== almuerzoCargaId) return;
+    almuerzoCargando = false;
+    document.getElementById('almuerzoResumen').textContent = '';
     est.className = 'mob-adicional-msg err';
     est.textContent = (err && err.message) ? err.message : 'Error de conexión.';
   }
@@ -5696,7 +5716,24 @@ async function cargarAlmuerzoInfo() {
 
 // Arma el formulario según lo que ya compró el stand. `aviso` (opcional) se
 // antepone al texto de estado, p. ej. para confirmar una venta recién hecha.
+function pintarAlmuerzoDetalle() {
+  const el = document.getElementById('almuerzoDetalle');
+  if (!el) return;
+  if (!almuerzoVentas.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="mob-adicional-label" style="margin-bottom:4px">Almuerzos vendidos a este stand</div>'
+    + almuerzoVentas.map(v => {
+        const sub = [v.v, v.mp, v.f].filter(Boolean).join(' · ');
+        return `<div class="alm-venta">`
+          + `<div class="alm-venta-top"><span>${Number(v.c) || 0}× ${almEsc(v.p)}</span>`
+          + (v.t ? `<span>$ ${Number(v.t).toLocaleString('es-AR')}</span>` : '') + `</div>`
+          + `<div class="alm-venta-sub">${almEsc(sub)}${v.o ? '<br>' + almEsc(v.o) : ''}</div>`
+          + `</div>`;
+      }).join('');
+  el.style.display = 'block';
+}
+
 function pintarAlmuerzoForm(aviso) {
+  pintarAlmuerzoDetalle();
   const est  = document.getElementById('almuerzoEstado');
   const form = document.getElementById('almuerzoForm');
   const restan = almuerzoMax - almuerzoVendidas;
@@ -5792,6 +5829,7 @@ async function venderAlmuerzo() {
       showToast(`✅ Almuerzo registrado · ${cant}× ${prod.n}`);
       if (standId === currentStandId) {
         almuerzoVendidas = Number(data.vendidas) || (almuerzoVendidas + cant);
+        if (data.venta) almuerzoVentas.push(data.venta);
         pintarAlmuerzoForm(`✅ Registrado: ${cant}× ${prod.n}`);
       }
     } else {
