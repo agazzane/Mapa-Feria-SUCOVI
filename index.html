@@ -382,6 +382,7 @@
   .contrato-badge { position: absolute; top: 2px; right: 4px; font-size: 17px; line-height: 1; z-index: 2; pointer-events: none; }
   .mob-badge      { position: absolute; top: 2px; left: 4px;  font-size: 17px; line-height: 1; z-index: 2; pointer-events: none; }
   .com-badge      { position: absolute; bottom: 2px; right: 4px; font-size: 15px; line-height: 1; z-index: 3; pointer-events: none; }
+  .alm-badge      { position: absolute; bottom: 2px; left: 4px;  font-size: 15px; line-height: 1; z-index: 3; pointer-events: none; }
 
   /* ── LEGEND ── */
   .legend {
@@ -471,6 +472,8 @@
   .modal-nuevo-badge { background: #d1f5de; color: #0a3d1f; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; letter-spacing: .3px; }
   .modal-rubro  { font-size: 14px; color: var(--text3); margin-top: 3px; }
   .modal-zona   { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .modal-almuerzo { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; padding: 2px 10px; font-size: 12px; font-weight: 600; color: #b45309; background: rgba(245,158,11,.16); border-radius: 100px; }
+  html[data-theme="dark"] .modal-almuerzo { color: #fbbf24; background: rgba(251,191,36,.14); }
   .modal-tel {
     display: inline-flex; align-items: center; gap: 8px;
     margin-top: 12px; padding: 9px 14px;
@@ -2301,10 +2304,11 @@ body.revalidando .stand { pointer-events: none; }
   <button class="success-continue-btn" id="successContinueBtn">Continuar</button>
 </div>
 
-<!-- MENÚ CONTEXTUAL DE STAND (solo aparece en stands Señados) -->
+<!-- MENÚ CONTEXTUAL DE STAND (stands Señado / Pagado / Excedido; "Agregar mobiliario" solo en Señado) -->
 <div class="stand-ctx-menu" id="standCtxMenu">
   <div class="stand-ctx-title" id="standCtxTitle"></div>
-  <button class="stand-ctx-item" onclick="ctxAgregarMobiliario()">🪑 Agregar mobiliario</button>
+  <button class="stand-ctx-item" id="ctxMobBtn" onclick="ctxAgregarMobiliario()">🪑 Agregar mobiliario</button>
+  <button class="stand-ctx-item" id="ctxAlmBtn" onclick="ctxVenderAlmuerzo()">🍔 Vender almuerzo</button>
 </div>
 
 <!-- MODAL -->
@@ -2331,6 +2335,7 @@ body.revalidando .stand { pointer-events: none; }
       <span class="modal-nuevo-badge" id="modalNuevoBadge" style="display:none">NUEVO</span>
     </div>
     <div class="modal-rubro"  id="modalRubro"></div>
+    <div class="modal-almuerzo" id="modalAlmuerzoTag" style="display:none">🍔 Almuerzo</div>
     <div class="modal-zona"   id="modalZona"></div>
     <!-- WHATSAPP -->
     <a id="modalTel" class="modal-tel" href="#" target="_blank" style="display:none">
@@ -2511,53 +2516,7 @@ body.revalidando .stand { pointer-events: none; }
       <div class="acc-body" id="almuerzoBody">
         <div class="mob-adicional-msg" id="almuerzoEstado" style="margin:0 0 10px"></div>
         <div id="almuerzoDetalle" style="display:none;margin:0 0 12px"></div>
-        <div id="almuerzoForm" style="display:none">
-          <div class="mob-adicional-row">
-            <div class="mob-adicional-group">
-              <label class="mob-adicional-label">Almuerzo</label>
-              <div class="mob-adicional-select-wrap">
-                <select class="mob-adicional-select" id="almProducto" onchange="actualizarAlmuerzoMonto()"></select>
-              </div>
-            </div>
-          </div>
-          <div class="mob-adicional-row">
-            <div class="mob-adicional-group">
-              <label class="mob-adicional-label">Cantidad</label>
-              <div class="mob-adicional-select-wrap">
-                <select class="mob-adicional-select" id="almCantidad" onchange="actualizarAlmuerzoMonto()"></select>
-              </div>
-            </div>
-            <div class="mob-adicional-group">
-              <label class="mob-adicional-label">Medio de pago</label>
-              <div class="mob-adicional-select-wrap">
-                <select class="mob-adicional-select" id="almMedio" onchange="checkAlmuerzoBtn()"></select>
-              </div>
-            </div>
-          </div>
-          <!-- Solo Admin (perfil 3): en nombre de qué vendedor se registra -->
-          <div class="mob-adicional-row" id="almVendedorGroup" style="display:none">
-            <div class="mob-adicional-group">
-              <label class="mob-adicional-label">Registrar en nombre de</label>
-              <div class="mob-adicional-select-wrap">
-                <select class="mob-adicional-select" id="almVendedor" onchange="checkAlmuerzoBtn()"></select>
-              </div>
-            </div>
-          </div>
-          <div class="mob-adicional-row">
-            <div class="mob-adicional-group">
-              <label class="mob-adicional-label">Monto ($) — pago 100%</label>
-              <input type="text" class="mob-adicional-input" id="almMonto" readonly placeholder="—" style="font-weight:700;cursor:default">
-            </div>
-          </div>
-          <div class="mob-adicional-row">
-            <div class="mob-adicional-group">
-              <label class="mob-adicional-label">Observaciones (opcional)</label>
-              <input type="text" class="mob-adicional-input" id="almObs" maxlength="200" placeholder="Ej: Retira Alejandra Solis">
-            </div>
-          </div>
-          <button class="mob-adicional-btn" id="almBtn" onclick="venderAlmuerzo()" disabled>Registrar venta de almuerzo</button>
-          <div class="mob-adicional-msg" id="almMsg"></div>
-        </div>
+        <button class="mob-adicional-open-btn" id="almuerzoOpenBtn" onclick="openAlmuerzoPanel()" style="display:none">🍔 Seleccionar almuerzo</button>
       </div>
     </div>
 
@@ -2616,6 +2575,47 @@ body.revalidando .stand { pointer-events: none; }
       </div>
       <div class="mob-list" id="mobAdicionalList"></div>
       <button class="assign-btn" style="margin-top:14px;background:#15803d;border:none" onclick="closeMobAdicionalPanel()">Confirmar selección</button>
+    </div>
+
+    <!-- Panel de venta de almuerzo (se abre desde el acordeón o desde el menú del mapa) -->
+    <div class="mob-panel" id="almuerzoPanel">
+      <div class="mob-header">
+        <button class="mob-back" onclick="closeAlmuerzoPanel()">← Volver</button>
+        <div class="mob-title">🍔 Vender almuerzo</div>
+      </div>
+      <div class="mob-senado-hint" id="almPanelNota" style="display:none"></div>
+      <div class="mob-list" id="almuerzoList"></div>
+      <div id="almuerzoForm" style="display:none;margin-top:14px">
+        <div class="mob-adicional-row">
+          <div class="mob-adicional-group">
+            <label class="mob-adicional-label">Medio de pago</label>
+            <div class="mob-adicional-select-wrap">
+              <select class="mob-adicional-select" id="almMedio" onchange="checkAlmuerzoBtn()"></select>
+            </div>
+          </div>
+          <div class="mob-adicional-group">
+            <label class="mob-adicional-label">Monto ($) — pago 100%</label>
+            <input type="text" class="mob-adicional-input" id="almMonto" readonly placeholder="—" style="font-weight:700;cursor:default">
+          </div>
+        </div>
+        <!-- Solo Admin (perfil 3): en nombre de qué vendedor se registra -->
+        <div class="mob-adicional-row" id="almVendedorGroup" style="display:none">
+          <div class="mob-adicional-group">
+            <label class="mob-adicional-label">Registrar en nombre de</label>
+            <div class="mob-adicional-select-wrap">
+              <select class="mob-adicional-select" id="almVendedor" onchange="checkAlmuerzoBtn()"></select>
+            </div>
+          </div>
+        </div>
+        <div class="mob-adicional-row">
+          <div class="mob-adicional-group">
+            <label class="mob-adicional-label">Observaciones (opcional)</label>
+            <input type="text" class="mob-adicional-input" id="almObs" maxlength="200" placeholder="Ej: Retira Alejandra Solis">
+          </div>
+        </div>
+        <button class="mob-adicional-btn" id="almBtn" onclick="venderAlmuerzo()" disabled>Registrar venta de almuerzo</button>
+        <div class="mob-adicional-msg" id="almMsg"></div>
+      </div>
     </div>
 
     <!-- Panel de alta de nuevo feriante -->
@@ -3110,6 +3110,7 @@ function buildGrid(gridId, data, skeleton = false) {
         const resp   = extra.p1r || '';  // responsable = quien hizo la asignación (pago 1)
         const contrato = extra.contrato === 'SI';
         const tieneMob = MOB_ITEMS.some(m => Number(extra[m.key]||0) > 0);
+        const tieneAlm = ((((FULL_DATA.almuerzo||{}).ventas||{})[s.num]) || []).length > 0;
         const ingreso  = extra.ingreso === 'SI';
         const rubTrunc = s.rb ? (s.rb.length>22 ? s.rb.slice(0,20)+'…' : s.rb) : '';
         const searchLabel = s.e==='Disponible' ? (nombre||rubTrunc) : rubTrunc;
@@ -3125,6 +3126,7 @@ function buildGrid(gridId, data, skeleton = false) {
           ${contrato ? `<span class="contrato-badge" title="Contrato firmado">✍️</span>` : ''}
           ${tieneMob ? `<span class="mob-badge" title="Tiene mobiliario">🪑</span>` : ''}
           ${extra.com ? `<span class="com-badge" title="Tiene comentario">📝</span>` : ''}
+          ${tieneAlm ? `<span class="alm-badge" title="Tiene almuerzo">🍔</span>` : ''}
           <span class="snum">${s.num}</span>
           ${searchLabel ? `<span class="srub">${searchLabel.length>22?searchLabel.slice(0,20)+'…':searchLabel}</span>` : ''}
           ${s.e==='Disponible'&&precio ? `<span class="srub" style="font-weight:700">$${Number(precio).toLocaleString('es-AR')}</span>` : ''}
@@ -3432,6 +3434,7 @@ function openModal(id, evt) {
   document.getElementById('modalNuevoBadge').style.display = (extra.condicion === 'NUEVO') ? 'inline-block' : 'none';
   document.getElementById('modalRubro').textContent  = data.rb || '(sin rubro)';
   document.getElementById('modalZona').textContent   = extra.contrato === 'SI' ? '✍️ Contrato firmado' : '';
+  refrescarAvisoAlmuerzo(id);   // 🍔 Almuerzo bajo el rubro, si el stand tiene al menos 1 almuerzo
 
   // Teléfono / WhatsApp
   const telEl = document.getElementById('modalTel');
@@ -3528,6 +3531,7 @@ function openModal(id, evt) {
   document.getElementById('comentariosPanel').classList.remove('active');
   document.getElementById('mobAdicionalPanel').classList.remove('active');
   document.getElementById('mobSenadoPanel').classList.remove('active');
+  document.getElementById('almuerzoPanel').classList.remove('active');
   document.getElementById('mainPanel').classList.remove('hidden');
   resetMobQty();
   updateMobSummary();
@@ -5430,10 +5434,19 @@ function standEsSenadoParaMenu(id) {
   return !!d && d.e === 'Señado';
 }
 
+// Stands que muestran el menú: Señado / Pagado / Excedido (perfil 1 y 3).
+// 'Agregar mobiliario' solo en Señado; 'Vender almuerzo' en los tres.
+function standTieneMenu(id) {
+  if (CURRENT_PERFIL !== 1 && CURRENT_PERFIL !== 3) return false;
+  const d = ((FULL_DATA && FULL_DATA.pbData) || {})[id] || ((FULL_DATA && FULL_DATA.paData) || {})[id];
+  return !!d && ALMUERZO_ESTADOS.includes(d.e);
+}
+
 function showStandCtxMenu(id, x, y) {
   const menu = document.getElementById('standCtxMenu');
   ctxStandId = id;
   document.getElementById('standCtxTitle').textContent = `Stand ${id}`;
+  document.getElementById('ctxMobBtn').style.display = standEsSenadoParaMenu(id) ? 'flex' : 'none';
   menu.style.display = 'block';
   const w = menu.offsetWidth, h = menu.offsetHeight;
   menu.style.left = Math.max(8, Math.min(x, window.innerWidth  - w - 8)) + 'px';
@@ -5447,7 +5460,7 @@ function hideStandCtxMenu() {
 // Desktop (clic derecho) y Android (mantener apretado dispara contextmenu)
 document.addEventListener('contextmenu', e => {
   const st = e.target.closest && e.target.closest('.stand');
-  if (!st || !standEsSenadoParaMenu(st.dataset.num)) return; // otros stands: menú normal del navegador
+  if (!st || !standTieneMenu(st.dataset.num)) return; // otros stands: menú normal del navegador
   e.preventDefault();
   showStandCtxMenu(st.dataset.num, e.clientX, e.clientY);
 });
@@ -5460,7 +5473,7 @@ document.addEventListener('contextmenu', e => {
     cancel();
     if (e.touches.length !== 1) return;
     const st = e.target.closest && e.target.closest('.stand');
-    if (!st || !standEsSenadoParaMenu(st.dataset.num)) return;
+    if (!st || !standTieneMenu(st.dataset.num)) return;
     const t = e.touches[0];
     start = { x: t.clientX, y: t.clientY };
     timer = setTimeout(() => {
@@ -5500,6 +5513,15 @@ function ctxAgregarMobiliario() {
   openModal(id, null);
   resetMobSenadoUI();
   openMobSenadoPanel();
+}
+
+// Opción del menú: abre la ficha del stand directamente en el panel de venta de almuerzo
+function ctxVenderAlmuerzo() {
+  const id = ctxStandId;
+  hideStandCtxMenu();
+  if (!id || !standTieneMenu(id)) return;
+  openModal(id, null);
+  openAlmuerzoPanel();
 }
 
 function resetMobSenadoQty() {
@@ -5633,6 +5655,9 @@ async function agregarMobSenado() {
 // Pagado / Excedido, perfil 1 (Vendedor) y 3 (Admin). Máximo 2 unidades por
 // stand en total (se valida también en el servidor). El pago es el 100%: el
 // monto es precio × cantidad y no se edita.
+// La venta se arma en un panel (como Mob. Adicional): lista de almuerzos con − / +,
+// UN solo producto por venta, y debajo medio de pago, observaciones y Registrar.
+// Se abre desde el botón del acordeón o desde el menú del mapa (clic derecho / mantener).
 const ALMUERZO_ESTADOS = ['Señado', 'Pagado', 'Excedido'];
 let almuerzoProductos = [];     // [{ n: descripción, p: precio }] desde PRECIOS
 let almuerzoVendidas = 0;       // unidades ya compradas por el stand abierto
@@ -5640,12 +5665,43 @@ let almuerzoVentas = [];        // detalle de lo vendido al stand abierto
 let almuerzoMax = 2;
 let almuerzoCargaId = 0;        // descarta respuestas viejas si se cambió de stand
 let almuerzoEnvioEnCurso = false;
-let almuerzoCargado = false;    // true cuando ya se consultó al servidor para el stand abierto
+let almuerzoCargado = false;    // true cuando ya se tienen los datos del stand abierto
 let almuerzoCargando = false;
 let almuerzoVentaSeq = 0;       // sube con cada venta: descarta una consulta que arrancó antes de la venta
+let almSel = { idx: -1, qty: 0 }; // selección del panel: UN producto + cantidad
 
 function almEsc(t) {
   return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function almRestan() { return Math.max(0, almuerzoMax - almuerzoVendidas); }
+function almPanelAbierto() {
+  const p = document.getElementById('almuerzoPanel');
+  return !!p && p.classList.contains('active');
+}
+
+// 🍔 "Almuerzo" bajo el rubro (ficha) + 🍔 en el mapa, si el stand tiene al menos 1 almuerzo.
+// Sale de FULL_DATA.almuerzo (lo trae el mapa), así no hace ningún pedido extra.
+function refrescarAvisoAlmuerzo(standId) {
+  if (!standId) return;
+  const ventas = (((FULL_DATA || {}).almuerzo || {}).ventas || {})[standId];
+  const tiene = !!(ventas && ventas.length);
+  if (standId === currentStandId) {
+    const tag = document.getElementById('modalAlmuerzoTag');
+    if (tag) tag.style.display = tiene ? 'inline-flex' : 'none';
+  }
+  const el = document.querySelector(`.stand[data-num="${CSS.escape(String(standId))}"]`);
+  if (!el) return;
+  const badge = el.querySelector('.alm-badge');
+  if (tiene && !badge) {
+    const b = document.createElement('span');
+    b.className = 'alm-badge';
+    b.title = 'Tiene almuerzo';
+    b.textContent = '🍔';
+    el.appendChild(b);
+  } else if (!tiene && badge) {
+    badge.remove();
+  }
 }
 
 function renderAlmuerzoSection(estado) {
@@ -5660,12 +5716,13 @@ function renderAlmuerzoSection(estado) {
   almuerzoVentas = [];
   almuerzoCargado = false;
   almuerzoCargando = false;
+  almSel = { idx: -1, qty: 0 };
   setAcc('almuerzoHeader', 'almuerzoBody', false);
   document.getElementById('almuerzoResumen').textContent = '…';
   const est = document.getElementById('almuerzoEstado');
   est.textContent = '';
   est.className = 'mob-adicional-msg';
-  document.getElementById('almuerzoForm').style.display = 'none';
+  document.getElementById('almuerzoOpenBtn').style.display = 'none';
   document.getElementById('almMsg').textContent = '';
   document.getElementById('almMsg').className = 'mob-adicional-msg';
   document.getElementById('almObs').value = '';
@@ -5694,7 +5751,7 @@ function toggleAlmuerzoAcc() {
   if (!body) return;
   const abrir = !body.classList.contains('open');
   setAcc('almuerzoHeader', 'almuerzoBody', abrir);
-  if (abrir && !almuerzoCargado && !almuerzoCargando) cargarAlmuerzoInfo(); // ya se consultó al abrir el stand; si falló, reintenta
+  if (abrir && !almuerzoCargado && !almuerzoCargando) cargarAlmuerzoInfo(); // si falló la precarga, reintenta
 }
 
 async function cargarAlmuerzoInfo(silencioso = false) {
@@ -5702,20 +5759,19 @@ async function cargarAlmuerzoInfo(silencioso = false) {
   if (!standId) return;
   const miCarga = ++almuerzoCargaId;
   const seq = almuerzoVentaSeq;
-  const est  = document.getElementById('almuerzoEstado');
-  const form = document.getElementById('almuerzoForm');
+  const est = document.getElementById('almuerzoEstado');
   if (!silencioso) {
     almuerzoCargando = true;
-    form.style.display = 'none';
     est.className = 'mob-adicional-msg';
     est.textContent = 'Consultando…';
+    document.getElementById('almuerzoOpenBtn').style.display = 'none';
   }
   try {
     const url = `${API_URL}?tipo=almuerzoinfo&mes=${encodeURIComponent(CURRENT_MES)}&stand=${encodeURIComponent(standId)}&_=${Date.now()}`;
     const [res] = await Promise.all([fetch(url, { cache: 'no-store' }), cargarMediosPago()]);
     const data = await res.json();
     if (miCarga !== almuerzoCargaId || standId !== currentStandId) return; // se cambió de stand mientras tanto
-    if (seq !== almuerzoVentaSeq) return;                                  // se vendió algo mientras consultaba: esta respuesta ya quedó vieja
+    if (seq !== almuerzoVentaSeq) return;                                  // se vendió algo mientras consultaba: respuesta vieja
     if (!data.ok) throw new Error(data.error || 'No se pudo consultar los almuerzos.');
 
     const nuevo = {
@@ -5737,6 +5793,7 @@ async function cargarAlmuerzoInfo(silencioso = false) {
       if (FULL_DATA && FULL_DATA.almuerzo) {
         if (!FULL_DATA.almuerzo.ventas) FULL_DATA.almuerzo.ventas = {};
         FULL_DATA.almuerzo.ventas[standId] = nuevo.ventas.slice();
+        refrescarAvisoAlmuerzo(standId);
       }
       if (!igual && !almuerzoEnvioEnCurso) pintarAlmuerzoForm();
       return;
@@ -5759,8 +5816,7 @@ async function cargarAlmuerzoInfo(silencioso = false) {
   }
 }
 
-// Arma el formulario según lo que ya compró el stand. La confirmación de una venta
-// recién hecha la da el toast; acá solo se muestra cuántos puede comprar todavía.
+// Detalle de lo comprado por el stand (dentro del acordeón)
 function pintarAlmuerzoDetalle() {
   const el = document.getElementById('almuerzoDetalle');
   if (!el) return;
@@ -5777,53 +5833,116 @@ function pintarAlmuerzoDetalle() {
   el.style.display = 'block';
 }
 
+// Acordeón: resumen de cabecera, detalle y botón para abrir el panel.
+// (No se muestran mensajes de "puede comprar N más" / "alcanzó el máximo": solo errores.)
 function pintarAlmuerzoForm() {
   pintarAlmuerzoDetalle();
-  const est  = document.getElementById('almuerzoEstado');
-  const form = document.getElementById('almuerzoForm');
-  const restan = almuerzoMax - almuerzoVendidas;
+  const est = document.getElementById('almuerzoEstado');
+  const btn = document.getElementById('almuerzoOpenBtn');
   document.getElementById('almuerzoResumen').textContent = `ya compró ${almuerzoVendidas} de ${almuerzoMax}`;
-  document.getElementById('almMsg').textContent = '';
-  document.getElementById('almMsg').className = 'mob-adicional-msg';
   est.className = 'mob-adicional-msg';
-
+  est.textContent = '';
+  btn.style.display = 'none';
   if (!almuerzoProductos.length) {
     est.className = 'mob-adicional-msg err';
     est.textContent = 'No hay almuerzos cargados en la hoja PRECIOS.';
-    form.style.display = 'none';
-    return;
+  } else if (almRestan() > 0) {
+    btn.style.display = 'block';
   }
-  if (restan <= 0) {
-    est.textContent = `Este stand ya alcanzó el máximo de ${almuerzoMax} almuerzos.`;
-    form.style.display = 'none';
-    return;
-  }
-  est.textContent = restan === 1 ? 'Puede comprar 1 más.' : `Puede comprar ${restan} más.`;
-  est.className = 'mob-adicional-msg ok';
+  if (almPanelAbierto()) renderAlmuerzoPanel();
+}
 
-  document.getElementById('almProducto').innerHTML = almuerzoProductos
-    .map((p, i) => `<option value="${i}">${almEsc(p.n)} · $ ${Number(p.p).toLocaleString('es-AR')}</option>`).join('');
-  document.getElementById('almCantidad').innerHTML = Array.from({ length: Math.min(restan, almuerzoMax) }, (_, i) => i + 1)
-    .map(n => `<option value="${n}">${n}</option>`).join('');
-  document.getElementById('almMedio').innerHTML = MEDIOS_PAGO.length
+function openAlmuerzoPanel() {
+  if (!almuerzoCargado && !almuerzoCargando) cargarAlmuerzoInfo(); // por si falló la precarga
+  almSel = { idx: -1, qty: 0 };
+  document.getElementById('almObs').value = '';
+  const m = document.getElementById('almMsg');
+  m.textContent = ''; m.className = 'mob-adicional-msg';
+  renderAlmuerzoPanel(false);
+  document.getElementById('mainPanel').classList.add('hidden');
+  document.getElementById('almuerzoPanel').classList.add('active');
+}
+
+function closeAlmuerzoPanel() {
+  document.getElementById('almuerzoPanel').classList.remove('active');
+  document.getElementById('mainPanel').classList.remove('hidden');
+}
+
+// Dibuja la lista (− / +) y el formulario del panel. `preservar`: al repintar por una
+// actualización en segundo plano, se conserva el medio de pago / vendedor ya elegidos.
+function renderAlmuerzoPanel(preservar = true) {
+  const nota = document.getElementById('almPanelNota');
+  const list = document.getElementById('almuerzoList');
+  const form = document.getElementById('almuerzoForm');
+  const restan = almRestan();
+  const prevMedio    = preservar ? document.getElementById('almMedio').value : '';
+  const prevVendedor = preservar ? document.getElementById('almVendedor').value : '';
+
+  const soloNota = txt => {
+    nota.textContent = txt; nota.style.display = 'block';
+    list.innerHTML = ''; form.style.display = 'none';
+  };
+  if (!almuerzoCargado) { soloNota('Consultando…'); return; }
+  if (!almuerzoProductos.length) { soloNota('No hay almuerzos cargados en la hoja PRECIOS.'); return; }
+  if (restan <= 0) { soloNota(`Este stand ya alcanzó el máximo de ${almuerzoMax} almuerzos.`); return; }
+
+  nota.style.display = 'none';
+  if (almSel.qty > restan) almSel.qty = restan;
+  if (almSel.qty <= 0) almSel = { idx: -1, qty: 0 };
+
+  list.innerHTML = almuerzoProductos.map((p, i) => {
+    const precio = '$' + Number(p.p).toLocaleString('es-AR');
+    return `
+    <div class="mob-item">
+      <div class="mob-item-name">${almEsc(p.n)} <span style="font-size:12px;color:#64748b;font-weight:500">${precio}</span></div>
+      <div class="mob-counter">
+        <button class="mob-btn minus" onclick="changeAlmuerzoQty(${i},-1)">−</button>
+        <span class="mob-qty" id="almqty_${i}">${almSel.idx === i ? almSel.qty : 0}</span>
+        <button class="mob-btn" onclick="changeAlmuerzoQty(${i},1)">+</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const selMedio = document.getElementById('almMedio');
+  selMedio.innerHTML = MEDIOS_PAGO.length
     ? '<option value="">— Elegí medio —</option>' + MEDIOS_PAGO.map(m => `<option value="${almEsc(m)}">${almEsc(m)}</option>`).join('')
     : '<option value="">Sin medios cargados</option>';
+  if (prevMedio && MEDIOS_PAGO.includes(prevMedio)) selMedio.value = prevMedio;
+
   const vg = document.getElementById('almVendedorGroup');
   if (CURRENT_PERFIL === 3) {
     vg.style.display = 'flex';
-    document.getElementById('almVendedor').innerHTML = '<option value="">— Elegí vendedor —</option>' +
+    const selVend = document.getElementById('almVendedor');
+    selVend.innerHTML = '<option value="">— Elegí vendedor —</option>' +
       VENDEDORES_LIST.map(v => `<option value="${almEsc(v)}">${almEsc(v)}</option>`).join('');
+    if (prevVendedor && VENDEDORES_LIST.includes(prevVendedor)) selVend.value = prevVendedor;
   } else {
     vg.style.display = 'none';
   }
-  document.getElementById('almObs').value = '';
   form.style.display = 'block';
   actualizarAlmuerzoMonto();
 }
 
+// − / +: UN solo producto por venta (elegir otro reemplaza al anterior). Tope = lo que le queda al stand.
+function changeAlmuerzoQty(i, delta) {
+  const restan = almRestan();
+  if (delta > 0) {
+    if (almSel.idx !== i) almSel = { idx: i, qty: 0 };
+    almSel.qty = Math.min(restan, almSel.qty + 1);
+  } else if (almSel.idx === i) {
+    almSel.qty = Math.max(0, almSel.qty - 1);
+    if (almSel.qty === 0) almSel = { idx: -1, qty: 0 };
+  }
+  almuerzoProductos.forEach((_, k) => {
+    const el = document.getElementById('almqty_' + k);
+    if (el) el.textContent = (almSel.idx === k ? almSel.qty : 0);
+  });
+  actualizarAlmuerzoMonto();
+}
+
 function actualizarAlmuerzoMonto() {
-  const prod = almuerzoProductos[parseInt(document.getElementById('almProducto').value, 10)];
-  const cant = parseInt(document.getElementById('almCantidad').value, 10) || 0;
+  const prod = almuerzoProductos[almSel.idx];
+  const cant = almSel.qty;
   document.getElementById('almMonto').value = (prod && cant) ? '$ ' + (prod.p * cant).toLocaleString('es-AR') : '';
   checkAlmuerzoBtn();
 }
@@ -5831,8 +5950,8 @@ function actualizarAlmuerzoMonto() {
 function checkAlmuerzoBtn() {
   const btn = document.getElementById('almBtn');
   if (!btn || almuerzoEnvioEnCurso) return;
-  const prodOk = !!almuerzoProductos[parseInt(document.getElementById('almProducto').value, 10)];
-  const cantOk = (parseInt(document.getElementById('almCantidad').value, 10) || 0) >= 1;
+  const prodOk = !!almuerzoProductos[almSel.idx];
+  const cantOk = almSel.qty >= 1;
   const medioOk = !!document.getElementById('almMedio').value.trim();
   const vendOk = CURRENT_PERFIL !== 3 || !!document.getElementById('almVendedor').value.trim();
   btn.disabled = !(prodOk && cantOk && medioOk && vendOk);
@@ -5842,8 +5961,8 @@ async function venderAlmuerzo() {
   if (almuerzoEnvioEnCurso || !currentStandId) return;
   const btn   = document.getElementById('almBtn');
   const msgEl = document.getElementById('almMsg');
-  const prod  = almuerzoProductos[parseInt(document.getElementById('almProducto').value, 10)];
-  const cant  = parseInt(document.getElementById('almCantidad').value, 10) || 0;
+  const prod  = almuerzoProductos[almSel.idx];
+  const cant  = almSel.qty;
   const medio = document.getElementById('almMedio').value.trim();
   const vendedor = CURRENT_PERFIL === 3 ? document.getElementById('almVendedor').value.trim() : '';
   const obs   = document.getElementById('almObs').value.trim();
@@ -5877,10 +5996,14 @@ async function venderAlmuerzo() {
         if (!FULL_DATA.almuerzo.ventas) FULL_DATA.almuerzo.ventas = {};
         (FULL_DATA.almuerzo.ventas[standId] = FULL_DATA.almuerzo.ventas[standId] || []).push(data.venta);
       }
+      refrescarAvisoAlmuerzo(standId);   // 🍔 en la ficha y en el mapa
       if (standId === currentStandId) {
         almuerzoVendidas = Number(data.vendidas) || (almuerzoVendidas + cant);
         if (data.venta) almuerzoVentas.push(data.venta);
+        almSel = { idx: -1, qty: 0 };
+        closeAlmuerzoPanel();
         pintarAlmuerzoForm();
+        setAcc('almuerzoHeader', 'almuerzoBody', true); // se abre el detalle para ver lo recién cargado
       }
     } else {
       msgEl.textContent = data.error || 'Error al registrar el almuerzo.';
@@ -5896,7 +6019,7 @@ async function venderAlmuerzo() {
     almuerzoEnvioEnCurso = false;
     modalLocked = false;
   }
-  if (refrescar && standId === currentStandId) cargarAlmuerzoInfo();
+  if (refrescar && standId === currentStandId) cargarAlmuerzoInfo(true);
   else if (standId === currentStandId) checkAlmuerzoBtn();
 }
 
