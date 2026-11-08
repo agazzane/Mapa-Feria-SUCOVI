@@ -5759,8 +5759,8 @@ async function cargarAlmuerzoInfo(silencioso = false) {
   }
 }
 
-// Arma el formulario según lo que ya compró el stand. `aviso` (opcional) se
-// antepone al texto de estado, p. ej. para confirmar una venta recién hecha.
+// Arma el formulario según lo que ya compró el stand. La confirmación de una venta
+// recién hecha la da el toast; acá solo se muestra cuántos puede comprar todavía.
 function pintarAlmuerzoDetalle() {
   const el = document.getElementById('almuerzoDetalle');
   if (!el) return;
@@ -5777,7 +5777,7 @@ function pintarAlmuerzoDetalle() {
   el.style.display = 'block';
 }
 
-function pintarAlmuerzoForm(aviso) {
+function pintarAlmuerzoForm() {
   pintarAlmuerzoDetalle();
   const est  = document.getElementById('almuerzoEstado');
   const form = document.getElementById('almuerzoForm');
@@ -5786,7 +5786,6 @@ function pintarAlmuerzoForm(aviso) {
   document.getElementById('almMsg').textContent = '';
   document.getElementById('almMsg').className = 'mob-adicional-msg';
   est.className = 'mob-adicional-msg';
-  const pre = aviso ? aviso + ' · ' : '';
 
   if (!almuerzoProductos.length) {
     est.className = 'mob-adicional-msg err';
@@ -5795,11 +5794,11 @@ function pintarAlmuerzoForm(aviso) {
     return;
   }
   if (restan <= 0) {
-    est.textContent = pre + `Este stand ya alcanzó el máximo de ${almuerzoMax} almuerzos.`;
+    est.textContent = `Este stand ya alcanzó el máximo de ${almuerzoMax} almuerzos.`;
     form.style.display = 'none';
     return;
   }
-  est.textContent = pre + `Ya compró ${almuerzoVendidas} de ${almuerzoMax} · puede comprar ${restan} más.`;
+  est.textContent = restan === 1 ? 'Puede comprar 1 más.' : `Puede comprar ${restan} más.`;
   est.className = 'mob-adicional-msg ok';
 
   document.getElementById('almProducto').innerHTML = almuerzoProductos
@@ -5881,7 +5880,7 @@ async function venderAlmuerzo() {
       if (standId === currentStandId) {
         almuerzoVendidas = Number(data.vendidas) || (almuerzoVendidas + cant);
         if (data.venta) almuerzoVentas.push(data.venta);
-        pintarAlmuerzoForm(`✅ Registrado: ${cant}× ${prod.n}`);
+        pintarAlmuerzoForm();
       }
     } else {
       msgEl.textContent = data.error || 'Error al registrar el almuerzo.';
