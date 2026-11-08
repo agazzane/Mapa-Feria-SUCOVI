@@ -471,9 +471,10 @@
   .modal-nombre { font-size: 17px; font-weight: 600; color: var(--text); }
   .modal-nuevo-badge { background: #d1f5de; color: #0a3d1f; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; letter-spacing: .3px; }
   .modal-rubro  { font-size: 14px; color: var(--text3); margin-top: 3px; }
-  .modal-zona   { font-size: 11px; color: var(--text3); margin-top: 3px; }
-  .modal-almuerzo { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; padding: 2px 10px; font-size: 12px; font-weight: 600; color: #b45309; background: rgba(245,158,11,.16); border-radius: 100px; }
-  html[data-theme="dark"] .modal-almuerzo { color: #fbbf24; background: rgba(251,191,36,.14); }
+  .modal-tags   { display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; row-gap: 2px; margin-top: 3px; }
+  .modal-zona   { font-size: 11px; color: var(--text3); }
+  .modal-zona:empty { display: none; }
+  .modal-almuerzo { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text3); }
   .modal-tel {
     display: inline-flex; align-items: center; gap: 8px;
     margin-top: 12px; padding: 9px 14px;
@@ -2335,8 +2336,10 @@ body.revalidando .stand { pointer-events: none; }
       <span class="modal-nuevo-badge" id="modalNuevoBadge" style="display:none">NUEVO</span>
     </div>
     <div class="modal-rubro"  id="modalRubro"></div>
-    <div class="modal-almuerzo" id="modalAlmuerzoTag" style="display:none">🍔 Almuerzo</div>
-    <div class="modal-zona"   id="modalZona"></div>
+    <div class="modal-tags">
+      <div class="modal-zona"   id="modalZona"></div>
+      <div class="modal-almuerzo" id="modalAlmuerzoTag" style="display:none">🍔 Almuerzo</div>
+    </div>
     <!-- WHATSAPP -->
     <a id="modalTel" class="modal-tel" href="#" target="_blank" style="display:none">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="#25d366">
@@ -6141,12 +6144,15 @@ function calcTotalMobAdicional() {
 
 function openMobAdicionalPanel() {
   const list = document.getElementById('mobAdicionalList');
+  const extraAct = (FULL_DATA.extraData || {})[currentStandId] || {};
   list.innerHTML = switchPrecioFeriaHTML() + MOB_ITEMS.map(m => {
     const precio = precioMobAdicional(m.label);
+    const yaTiene = Number(extraAct[m.key] || 0);
+    const lockedStr = yaTiene > 0 ? `<span class="mob-item-locked">🔒 Ya alquilado ×${yaTiene}</span>` : '';
     const precioStr = `<span id="mapre_${m.key}" style="font-size:12px;color:#64748b;font-weight:500">${precio ? '$' + precio.toLocaleString('es-AR') : ''}</span>`;
     return `
     <div class="mob-item">
-      <div class="mob-item-name">${m.label} ${precioStr}</div>
+      <div class="mob-item-name">${m.label} ${precioStr}${lockedStr}</div>
       <div class="mob-counter">
         <button class="mob-btn minus" onclick="changeMobAdicionalQty('${m.key}',-1)">−</button>
         <span class="mob-qty" id="maqty_${m.key}">${mobAdicionalQty[m.key]||0}</span>
