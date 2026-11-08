@@ -1665,7 +1665,7 @@ html[data-theme="dark"] .filtros-sheet .search-filters-row { background: transpa
 .mob-adicional-select:focus, .alta-input:focus, .alta-select:focus, .comentarios-textarea:focus {
   border-color: var(--ind); box-shadow: 0 0 0 3px rgba(58,31,180,.12);
 }
-#mobAdicionalMonto { background: var(--ind-soft) !important; color: var(--ind) !important; }
+#mobAdicionalMonto, #almMonto { background: var(--ind-soft) !important; color: var(--ind) !important; }
 .select-wrap::after, .alta-select-wrap::after, .pago-select-wrap::after,
 .assign-pago-select-wrap::after, .mob-adicional-select-wrap::after { color: var(--ind); }
 
@@ -2499,6 +2499,64 @@ body.revalidando .stand { pointer-events: none; }
       </div>
     </div>
 
+    <!-- VENTA ALMUERZO (v3.16): stands Señado / Pagado / Excedido, solo perfil 1 y 3 -->
+    <div class="mob-adicional-section" id="almuerzoSection" style="display:none">
+      <div class="mob-adicional-title acc-header" id="almuerzoHeader" onclick="toggleAlmuerzoAcc()">
+        <span class="acc-header-left">🍔 Vender almuerzo</span>
+        <span class="acc-header-left"><span class="acc-summary" id="almuerzoResumen"></span><span class="acc-chevron">▾</span></span>
+      </div>
+      <div class="acc-body" id="almuerzoBody">
+        <div class="mob-adicional-msg" id="almuerzoEstado" style="margin:0 0 10px"></div>
+        <div id="almuerzoForm" style="display:none">
+          <div class="mob-adicional-row">
+            <div class="mob-adicional-group">
+              <label class="mob-adicional-label">Almuerzo</label>
+              <div class="mob-adicional-select-wrap">
+                <select class="mob-adicional-select" id="almProducto" onchange="actualizarAlmuerzoMonto()"></select>
+              </div>
+            </div>
+          </div>
+          <div class="mob-adicional-row">
+            <div class="mob-adicional-group">
+              <label class="mob-adicional-label">Cantidad</label>
+              <div class="mob-adicional-select-wrap">
+                <select class="mob-adicional-select" id="almCantidad" onchange="actualizarAlmuerzoMonto()"></select>
+              </div>
+            </div>
+            <div class="mob-adicional-group">
+              <label class="mob-adicional-label">Medio de pago</label>
+              <div class="mob-adicional-select-wrap">
+                <select class="mob-adicional-select" id="almMedio" onchange="checkAlmuerzoBtn()"></select>
+              </div>
+            </div>
+          </div>
+          <!-- Solo Admin (perfil 3): en nombre de qué vendedor se registra -->
+          <div class="mob-adicional-row" id="almVendedorGroup" style="display:none">
+            <div class="mob-adicional-group">
+              <label class="mob-adicional-label">Registrar en nombre de</label>
+              <div class="mob-adicional-select-wrap">
+                <select class="mob-adicional-select" id="almVendedor" onchange="checkAlmuerzoBtn()"></select>
+              </div>
+            </div>
+          </div>
+          <div class="mob-adicional-row">
+            <div class="mob-adicional-group">
+              <label class="mob-adicional-label">Monto ($) — pago 100%</label>
+              <input type="text" class="mob-adicional-input" id="almMonto" readonly placeholder="—" style="font-weight:700;cursor:default">
+            </div>
+          </div>
+          <div class="mob-adicional-row">
+            <div class="mob-adicional-group">
+              <label class="mob-adicional-label">Observaciones (opcional)</label>
+              <input type="text" class="mob-adicional-input" id="almObs" maxlength="200" placeholder="Ej: Retira Alejandra Solis">
+            </div>
+          </div>
+          <button class="mob-adicional-btn" id="almBtn" onclick="venderAlmuerzo()" disabled>Registrar venta de almuerzo</button>
+          <div class="mob-adicional-msg" id="almMsg"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- INGRESO (solo Admin, cuando pago 100% + contrato firmado + no ingresó) -->
     <div class="ingreso-section" id="ingresoSection" style="display:none">
       <button class="contrato-btn" id="contratoBtn" onclick="confirmarContrato()" style="display:none">✍️ Confirmar firma de contrato</button>
@@ -2623,7 +2681,7 @@ let lastTap = 0;
 document.addEventListener('touchend', e => { const now=Date.now(); if(now-lastTap<300) e.preventDefault(); lastTap=now; }, {passive:false});
 
 // ── VERSIÓN DE LA APP ────────────────────────────────────────────────────────
-const APP_VERSION = 'v3.15';   // ← cambiá solo acá
+const APP_VERSION = 'v3.16';   // ← cambiá solo acá
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   const hv = document.getElementById('headerVersion');
@@ -3520,6 +3578,9 @@ function openModal(id, evt) {
   } else {
     mobAdicionalSection.style.display = 'none';
   }
+
+  // Sección almuerzo (v3.16): Señado / Pagado / Excedido, perfil 1 y 3
+  renderAlmuerzoSection(estado);
 
   // ── INGRESO (solo Admin) ──────────────────────────────────────────────
   const ingresoMsg = document.getElementById('ingresoMsg');
@@ -5561,6 +5622,194 @@ async function agregarMobSenado() {
     msgEl.textContent = 'Error de conexión.';
     msgEl.className = 'mob-senado-msg err';
   }
+}
+
+// ── VENTA DE ALMUERZO (v3.16) ────────────────────────────────────────────────
+// Solo escribe en la hoja "Venta Almuerzos" (no toca FERIA). Stands Señado /
+// Pagado / Excedido, perfil 1 (Vendedor) y 3 (Admin). Máximo 2 unidades por
+// stand en total (se valida también en el servidor). El pago es el 100%: el
+// monto es precio × cantidad y no se edita.
+const ALMUERZO_ESTADOS = ['Señado', 'Pagado', 'Excedido'];
+let almuerzoProductos = [];     // [{ n: descripción, p: precio }] desde PRECIOS
+let almuerzoVendidas = 0;       // unidades ya compradas por el stand abierto
+let almuerzoMax = 2;
+let almuerzoCargaId = 0;        // descarta respuestas viejas si se cambió de stand
+let almuerzoEnvioEnCurso = false;
+
+function almEsc(t) {
+  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderAlmuerzoSection(estado) {
+  const sec = document.getElementById('almuerzoSection');
+  if (!sec) return;
+  const puede = ALMUERZO_ESTADOS.includes(estado) && (CURRENT_PERFIL === 1 || CURRENT_PERFIL === 3);
+  if (!puede) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  almuerzoCargaId++;
+  almuerzoProductos = [];
+  almuerzoVendidas = 0;
+  setAcc('almuerzoHeader', 'almuerzoBody', false);
+  document.getElementById('almuerzoResumen').textContent = '';
+  const est = document.getElementById('almuerzoEstado');
+  est.textContent = '';
+  est.className = 'mob-adicional-msg';
+  document.getElementById('almuerzoForm').style.display = 'none';
+  document.getElementById('almMsg').textContent = '';
+  document.getElementById('almMsg').className = 'mob-adicional-msg';
+  document.getElementById('almObs').value = '';
+}
+
+function toggleAlmuerzoAcc() {
+  const body = document.getElementById('almuerzoBody');
+  if (!body) return;
+  const abrir = !body.classList.contains('open');
+  setAcc('almuerzoHeader', 'almuerzoBody', abrir);
+  if (abrir) cargarAlmuerzoInfo();   // al abrir: productos/precios y unidades ya vendidas, siempre frescos
+}
+
+async function cargarAlmuerzoInfo() {
+  const standId = currentStandId;
+  if (!standId) return;
+  const miCarga = ++almuerzoCargaId;
+  const est  = document.getElementById('almuerzoEstado');
+  const form = document.getElementById('almuerzoForm');
+  form.style.display = 'none';
+  est.className = 'mob-adicional-msg';
+  est.textContent = 'Consultando…';
+  try {
+    const url = `${API_URL}?tipo=almuerzoinfo&mes=${encodeURIComponent(CURRENT_MES)}&stand=${encodeURIComponent(standId)}&_=${Date.now()}`;
+    const [res] = await Promise.all([fetch(url, { cache: 'no-store' }), cargarMediosPago()]);
+    const data = await res.json();
+    if (miCarga !== almuerzoCargaId || standId !== currentStandId) return; // se cambió de stand mientras tanto
+    if (!data.ok) throw new Error(data.error || 'No se pudo consultar los almuerzos.');
+    almuerzoProductos = data.productos || [];
+    almuerzoVendidas  = Number(data.vendidas) || 0;
+    almuerzoMax       = Number(data.max) || 2;
+    pintarAlmuerzoForm();
+  } catch (err) {
+    if (miCarga !== almuerzoCargaId) return;
+    est.className = 'mob-adicional-msg err';
+    est.textContent = (err && err.message) ? err.message : 'Error de conexión.';
+  }
+}
+
+// Arma el formulario según lo que ya compró el stand. `aviso` (opcional) se
+// antepone al texto de estado, p. ej. para confirmar una venta recién hecha.
+function pintarAlmuerzoForm(aviso) {
+  const est  = document.getElementById('almuerzoEstado');
+  const form = document.getElementById('almuerzoForm');
+  const restan = almuerzoMax - almuerzoVendidas;
+  document.getElementById('almuerzoResumen').textContent = `ya compró ${almuerzoVendidas} de ${almuerzoMax}`;
+  document.getElementById('almMsg').textContent = '';
+  document.getElementById('almMsg').className = 'mob-adicional-msg';
+  est.className = 'mob-adicional-msg';
+  const pre = aviso ? aviso + ' · ' : '';
+
+  if (!almuerzoProductos.length) {
+    est.className = 'mob-adicional-msg err';
+    est.textContent = 'No hay almuerzos cargados en la hoja PRECIOS.';
+    form.style.display = 'none';
+    return;
+  }
+  if (restan <= 0) {
+    est.textContent = pre + `Este stand ya alcanzó el máximo de ${almuerzoMax} almuerzos.`;
+    form.style.display = 'none';
+    return;
+  }
+  est.textContent = pre + `Ya compró ${almuerzoVendidas} de ${almuerzoMax} · puede comprar ${restan} más.`;
+  est.className = 'mob-adicional-msg ok';
+
+  document.getElementById('almProducto').innerHTML = almuerzoProductos
+    .map((p, i) => `<option value="${i}">${almEsc(p.n)} · $ ${Number(p.p).toLocaleString('es-AR')}</option>`).join('');
+  document.getElementById('almCantidad').innerHTML = Array.from({ length: Math.min(restan, almuerzoMax) }, (_, i) => i + 1)
+    .map(n => `<option value="${n}">${n}</option>`).join('');
+  document.getElementById('almMedio').innerHTML = MEDIOS_PAGO.length
+    ? '<option value="">— Elegí medio —</option>' + MEDIOS_PAGO.map(m => `<option value="${almEsc(m)}">${almEsc(m)}</option>`).join('')
+    : '<option value="">Sin medios cargados</option>';
+  const vg = document.getElementById('almVendedorGroup');
+  if (CURRENT_PERFIL === 3) {
+    vg.style.display = 'flex';
+    document.getElementById('almVendedor').innerHTML = '<option value="">— Elegí vendedor —</option>' +
+      VENDEDORES_LIST.map(v => `<option value="${almEsc(v)}">${almEsc(v)}</option>`).join('');
+  } else {
+    vg.style.display = 'none';
+  }
+  document.getElementById('almObs').value = '';
+  form.style.display = 'block';
+  actualizarAlmuerzoMonto();
+}
+
+function actualizarAlmuerzoMonto() {
+  const prod = almuerzoProductos[parseInt(document.getElementById('almProducto').value, 10)];
+  const cant = parseInt(document.getElementById('almCantidad').value, 10) || 0;
+  document.getElementById('almMonto').value = (prod && cant) ? '$ ' + (prod.p * cant).toLocaleString('es-AR') : '';
+  checkAlmuerzoBtn();
+}
+
+function checkAlmuerzoBtn() {
+  const btn = document.getElementById('almBtn');
+  if (!btn || almuerzoEnvioEnCurso) return;
+  const prodOk = !!almuerzoProductos[parseInt(document.getElementById('almProducto').value, 10)];
+  const cantOk = (parseInt(document.getElementById('almCantidad').value, 10) || 0) >= 1;
+  const medioOk = !!document.getElementById('almMedio').value.trim();
+  const vendOk = CURRENT_PERFIL !== 3 || !!document.getElementById('almVendedor').value.trim();
+  btn.disabled = !(prodOk && cantOk && medioOk && vendOk);
+}
+
+async function venderAlmuerzo() {
+  if (almuerzoEnvioEnCurso || !currentStandId) return;
+  const btn   = document.getElementById('almBtn');
+  const msgEl = document.getElementById('almMsg');
+  const prod  = almuerzoProductos[parseInt(document.getElementById('almProducto').value, 10)];
+  const cant  = parseInt(document.getElementById('almCantidad').value, 10) || 0;
+  const medio = document.getElementById('almMedio').value.trim();
+  const vendedor = CURRENT_PERFIL === 3 ? document.getElementById('almVendedor').value.trim() : '';
+  const obs   = document.getElementById('almObs').value.trim();
+
+  msgEl.textContent = '';
+  msgEl.className = 'mob-adicional-msg';
+  if (!prod)  { msgEl.textContent = 'Elegí un almuerzo.'; msgEl.className = 'mob-adicional-msg err'; return; }
+  if (!cant)  { msgEl.textContent = 'Elegí la cantidad.'; msgEl.className = 'mob-adicional-msg err'; return; }
+  if (!medio) { msgEl.textContent = 'Seleccioná un medio de pago.'; msgEl.className = 'mob-adicional-msg err'; return; }
+  if (CURRENT_PERFIL === 3 && !vendedor) { msgEl.textContent = 'Elegí el vendedor.'; msgEl.className = 'mob-adicional-msg err'; return; }
+
+  const standId = currentStandId;
+  almuerzoEnvioEnCurso = true;
+  modalLocked = true;   // que el polling no recargue el mapa a mitad de la venta
+  setBtnBusy(btn, 'Guardando...');
+  let refrescar = false;
+  try {
+    const url = `${API_URL}?tipo=almuerzo&mes=${encodeURIComponent(CURRENT_MES)}&stand=${encodeURIComponent(standId)}`
+      + `&user=${encodeURIComponent(CURRENT_USER)}&producto=${encodeURIComponent(prod.n)}&cant=${cant}`
+      + `&medio=${encodeURIComponent(medio)}`
+      + (vendedor ? `&vendedor=${encodeURIComponent(vendedor)}` : '')
+      + `&obs=${encodeURIComponent(obs)}`;
+    const res  = await fetch(url, { cache: 'no-store' });
+    const data = await res.json();
+    clearBtnBusy(btn, 'Registrar venta de almuerzo');
+    if (data.ok) {
+      showToast(`✅ Almuerzo registrado · ${cant}× ${prod.n}`);
+      if (standId === currentStandId) {
+        almuerzoVendidas = Number(data.vendidas) || (almuerzoVendidas + cant);
+        pintarAlmuerzoForm(`✅ Registrado: ${cant}× ${prod.n}`);
+      }
+    } else {
+      msgEl.textContent = data.error || 'Error al registrar el almuerzo.';
+      msgEl.className = 'mob-adicional-msg err';
+      // si falló por el máximo, otro vendedor pudo haber vendido: se actualiza el contador
+      refrescar = /máximo|puede comprar/i.test(data.error || '');
+    }
+  } catch (err) {
+    clearBtnBusy(btn, 'Registrar venta de almuerzo');
+    msgEl.textContent = 'Error de conexión.';
+    msgEl.className = 'mob-adicional-msg err';
+  } finally {
+    almuerzoEnvioEnCurso = false;
+    modalLocked = false;
+  }
+  if (refrescar && standId === currentStandId) cargarAlmuerzoInfo();
+  else if (standId === currentStandId) checkAlmuerzoBtn();
 }
 
 // ── MOBILIARIO ADICIONAL (stands Pagados, perfil 1) ──────────────────────────
